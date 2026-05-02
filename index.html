@@ -43,7 +43,24 @@
     </aside>
 
     <main class="flex-1">
-      <header class="p-4 border-b border-slate-800 bg-slate-950 no-print">
+     <header class="p-4 border-b border-slate-800 bg-slate-950 no-print">
+
+  <!-- 🔽 VENSTRE: LOGO -->
+  <div style="display:flex; align-items:center; justify-content:space-between;">
+
+    <div style="display:flex; align-items:center; gap:12px;">
+      <img src="assets/logo/ak3d-logo.png" style="height:40px;">
+      <h1 style="font-size:18px; font-weight:600;">3D Print Produktionssystem</h1>
+    </div>
+
+    <!-- 🔽 HØJRE: (her kan du senere smide knapper ind) -->
+    <div>
+      <!-- tom lige nu -->
+    </div>
+
+  </div>
+
+</header>
         <div class="flex flex-wrap items-end gap-3">
           <div>
             <label class="label">Projekt</label>
@@ -278,6 +295,28 @@
       <section id="tab-invoice" class="view p-6 hidden">
         <h2 class="title">Faktura</h2>
         <div class="card p-6">
+      
+<div class="flex justify-between items-start mb-6 border-b border-slate-700 pb-4">
+
+  <!-- VENSTRE: LOGO + FIRMA -->
+  <div>
+    <img src="assets/logo/ak3d-logo.png" style="height:60px; margin-bottom:8px;">
+    <div class="text-sm text-slate-300">
+      <div style="font-weight:600; font-size:18px; color:white;">AK3D</div>
+      <div>3D Print & Produktion</div>
+      <div>CVR: 12345678</div> <!-- ret senere -->
+    </div>
+  </div>
+
+  <!-- HØJRE: FAKTURA INFO -->
+  <div style="text-align:right;" class="text-sm text-slate-300">
+    <div style="font-size:22px; font-weight:700; color:white;">FAKTURA</div>
+    <div>Ordrenr: <span id="invOrderNo"></span></div>
+    <div>Dato: <span id="invDate"></span></div>
+    <div>Forfald: <span id="invDueDate"></span></div>
+  </div>
+
+</div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <h3 class="section">Kunde</h3>
