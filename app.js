@@ -411,7 +411,6 @@ function getAllPlates(){
   return plates;
 }
 
-function setPlateDone(key, done){
 function setPlateStatus(key, status){
   state.plateProgress[key] = status;
   saveCurrentOrderSnapshot();
@@ -420,14 +419,14 @@ function setPlateStatus(key, status){
 }
 
 function markAllPlatesDone(){
-  getAllPlates().forEach(p => { state.plateProgress[p.key] = true; });
+  getAllPlates().forEach(p => { state.plateProgress[p.key] = 'Færdig'; });
   saveCurrentOrderSnapshot();
   saveState();
   renderOrderStatus();
 }
 
 function resetAllPlates(){
-  getAllPlates().forEach(p => { state.plateProgress[p.key] = false; });
+  getAllPlates().forEach(p => { state.plateProgress[p.key] = 'Planlagt'; });
   saveCurrentOrderSnapshot();
   saveState();
   renderOrderStatus();
