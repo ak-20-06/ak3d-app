@@ -19,3 +19,99 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
 .inventory-pad .table-input{min-height:44px;font-size:1rem}
 .inventory-pad .table-btn{min-height:44px;min-width:52px;font-size:1rem}
 @media print{.no-print,aside,header{display:none!important}body{background:#fff!important;color:#000!important}.card{background:#fff!important;color:#000!important;border:1px solid #cbd5e1!important}}
+/* ===== PROFESSIONEL FAKTURA PRINT ===== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  #tab-invoice,
+  #tab-invoice * {
+    visibility: visible !important;
+  }
+
+  #tab-invoice {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  #tab-invoice > h2,
+  .no-print,
+  #internalInvoiceInfo {
+    display: none !important;
+  }
+
+  #tab-invoice .card {
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    max-width: 190mm !important;
+    margin: 0 auto !important;
+    transform: scale(0.92);
+    transform-origin: top center;
+  }
+
+  #tab-invoice input,
+  #tab-invoice textarea {
+    border: none !important;
+    background: transparent !important;
+    color: black !important;
+    padding: 2px 0 !important;
+    font-size: 11px !important;
+    min-height: unset !important;
+    box-shadow: none !important;
+  }
+
+  #tab-invoice textarea {
+    height: 34px !important;
+    resize: none !important;
+  }
+
+  #tab-invoice .section {
+    font-size: 12px !important;
+    margin-bottom: 4px !important;
+    color: black !important;
+  }
+
+  #tab-invoice .table-ui {
+    font-size: 10px !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #tab-invoice .table-ui th,
+  #tab-invoice .table-ui td {
+    padding: 4px 5px !important;
+    border: 1px solid #ccc !important;
+    color: black !important;
+  }
+
+  #tab-invoice img {
+    max-height: 55px !important;
+    width: auto !important;
+    filter: none !important;
+  }
+
+  #tab-invoice .text-slate-300,
+  #tab-invoice .text-slate-400,
+  #tab-invoice .text-white {
+    color: black !important;
+  }
+}
