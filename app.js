@@ -943,3 +943,16 @@ function exportCSV(){
   a.download = `ordre-${state.orderNo || 'export'}.csv`;
   a.click();
 }
+if (sbClient) {
+  sbClient
+    .channel('orders-changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'orders' },
+      payload => {
+        console.log('Ændring:', payload);
+        location.reload(); // nem løsning
+      }
+    )
+    .subscribe();
+}
