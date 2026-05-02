@@ -4,21 +4,29 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   
-  <title>3D Print Produktionssystem</title>
+  <title>AK3D Produktionssystem</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body class="bg-slate-950 text-slate-100">
   <div class="min-h-screen flex">
     <aside class="w-72 bg-slate-900 border-r border-slate-800 no-print">
       <div class="p-4 border-b border-slate-800">
-        <div class="font-bold text-lg">3D Print Produktionssystem</div>
-        <div class="text-xs text-slate-400 mt-1">Ordre: <span id="headerOrderNo">-</span></div>
+        <div class="flex items-center gap-3">
+          <img src="assets/logo/ak3d-logo.png" alt="AK3D logo" style="height:42px;">
+          <div>
+            <div class="font-bold text-lg">AK3D</div>
+            <div class="text-xs text-slate-400">Produktionssystem</div>
+          </div>
+        </div>
+        <div class="text-xs text-slate-400 mt-3">Ordre: <span id="headerOrderNo">-</span></div>
         <div class="text-xs text-slate-400">Projekt: <span id="headerProjectName">-</span></div>
       </div>
+
       <nav class="p-3 space-y-1 text-sm">
         <button class="navbtn active" data-tab="dashboard">🏠 Dashboard</button>
         <button class="navbtn" data-tab="orders">📦 Ordrer</button>
@@ -33,6 +41,7 @@
         <button class="navbtn" data-tab="invoice">📄 Faktura</button>
         <button class="navbtn" data-tab="settings">⚙️ Indstillinger</button>
       </nav>
+
       <div class="p-3 border-t border-slate-800 grid grid-cols-2 gap-2 text-sm">
         <button id="backupBtn" class="btn bg-indigo-600 hover:bg-indigo-500">Backup</button>
         <label for="restoreFile" class="btn bg-slate-700 hover:bg-slate-600 cursor-pointer text-center">Import</label>
@@ -43,25 +52,17 @@
     </aside>
 
     <main class="flex-1">
-     <header class="p-4 border-b border-slate-800 bg-slate-950 no-print">
+      <header class="p-4 border-b border-slate-800 bg-slate-950 no-print">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <img src="assets/logo/ak3d-logo.png" alt="AK3D logo" style="height:40px;">
+            <div>
+              <div class="font-semibold text-lg">AK3D</div>
+              <div class="text-xs text-slate-400">3D Print Produktionssystem</div>
+            </div>
+          </div>
+        </div>
 
-  <!-- 🔽 VENSTRE: LOGO -->
-  <div style="display:flex; align-items:center; justify-content:space-between;">
-
-    <div style="display:flex; align-items:center; gap:12px;">
-      <img src="assets/logo/ak3d-logo.png" style="height:80px;">
-      <div style="font-weight:700; font-size:20px;">AK3D</div>
-<div style="font-size:12px; opacity:0.8;">3D Print & Produktion</div>
-    </div>
-
-    <!-- 🔽 HØJRE: (her kan du senere smide knapper ind) -->
-    <div>
-      <!-- tom lige nu -->sty
-    </div>
-
-  </div>
-
-</header>
         <div class="flex flex-wrap items-end gap-3">
           <div>
             <label class="label">Projekt</label>
@@ -155,7 +156,6 @@
           </table>
         </div>
       </section>
-
 
       <section id="tab-order_status" class="view p-6 hidden">
         <h2 class="title">Ordre status</h2>
@@ -295,29 +295,26 @@
 
       <section id="tab-invoice" class="view p-6 hidden">
         <h2 class="title">Faktura</h2>
+
         <div class="card p-6">
-      
-<div class="flex justify-between items-start mb-6 border-b border-slate-700 pb-4">
+          <div class="flex justify-between items-start mb-8 border-b border-slate-700 pb-6">
+            <div>
+              <img src="assets/logo/ak3d-logo.png" alt="AK3D logo" style="height:80px; margin-bottom:8px;">
+              <div class="text-sm text-slate-300">
+                <div style="font-weight:700; font-size:20px; color:white;">AK3D</div>
+                <div>3D Print & Produktion</div>
+                <div>CVR: 12345678</div>
+              </div>
+            </div>
 
-  <!-- VENSTRE: LOGO + FIRMA -->
-  <div>
-    <img src="assets/logo/ak3d-logo.png" style="height:60px; margin-bottom:8px;">
-    <div class="text-sm text-slate-300">
-      <div style="font-weight:600; font-size:18px; color:white;">AK3D</div>
-      <div>3D Print & Produktion</div>
-      <div>CVR: 12345678</div> <!-- ret senere -->
-    </div>
-  </div>
+            <div style="text-align:right;" class="text-sm text-slate-300">
+              <div style="font-size:22px; font-weight:700; color:white;">FAKTURA</div>
+              <div>Ordrenr.: <span id="invOrderNo">-</span></div>
+              <div>Dato: <span id="invDate"></span></div>
+              <div>Forfald: <span id="invDueDate"></span></div>
+            </div>
+          </div>
 
-  <!-- HØJRE: FAKTURA INFO -->
-  <div style="text-align:right;" class="text-sm text-slate-300">
-    <div style="font-size:22px; font-weight:700; color:white;">FAKTURA</div>
-    <div>Ordrenr: <span id="invOrderNo"></span></div>
-    <div>Dato: <span id="invDate"></span></div>
-    <div>Forfald: <span id="invDueDate"></span></div>
-  </div>
-
-</div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <h3 class="section">Kunde</h3>
@@ -332,21 +329,31 @@
               <textarea id="invNote" class="input w-full" rows="3" placeholder="Bemærkning"></textarea>
             </div>
           </div>
+
           <div class="mb-4 text-sm text-slate-300 flex flex-wrap justify-between gap-4">
-            <div><div>Ordrenr.: <span id="invOrderNo">-</span></div><div>Projekt: <span id="invProject">-</span></div><div>Dato: <span id="invDate"></span></div></div>
-            <div><div>Enheder: <span id="invUnits">0</span></div><div>Moms: <span id="invMoms">25%</span></div><div>Status: <span id="invStatus">-</span></div></div>
+            <div>
+              <div>Projekt: <span id="invProject">-</span></div>
+              <div>Enheder: <span id="invUnits">0</span></div>
+            </div>
+            <div>
+              <div>Moms: <span id="invMoms">25%</span></div>
+              <div>Status: <span id="invStatus">-</span></div>
+            </div>
           </div>
+
           <div class="overflow-x-auto mb-4">
             <table class="table-ui">
               <thead><tr><th>Beskrivelse</th><th class="text-right">Antal</th><th class="text-right">Enhedspris ex moms</th><th class="text-right">Enhedspris inkl moms</th><th class="text-right">Linjetotal inkl moms</th></tr></thead>
               <tbody id="invoiceBody"></tbody>
             </table>
           </div>
+
           <div class="flex flex-col items-end gap-1 text-sm">
             <div>Sum ekskl. moms: <span id="invTotalEx">0,00 kr</span></div>
             <div>Moms: <span id="invMomsAmount">0,00 kr</span></div>
             <div class="text-lg font-bold">Total inkl. moms: <span id="invTotalInc">0,00 kr</span></div>
           </div>
+
           <div id="internalInvoiceInfo" class="mt-4 text-xs text-slate-400 no-print"></div>
         </div>
       </section>
@@ -370,7 +377,7 @@
     </main>
   </div>
 
-<script src="config.js"></script>
-<script src="app.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
