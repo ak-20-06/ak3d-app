@@ -956,3 +956,15 @@ if (sbClient) {
     )
     .subscribe();
 }
+// Sæt dato automatisk på faktura
+setInterval(() => {
+  const d = new Date();
+  const due = new Date();
+  due.setDate(d.getDate() + 8);
+
+  const invDate = document.getElementById('invDate');
+  const invDue = document.getElementById('invDueDate');
+
+  if (invDate) invDate.textContent = d.toLocaleDateString('da-DK');
+  if (invDue) invDue.textContent = due.toLocaleDateString('da-DK');
+}, 1000);
