@@ -1,3 +1,13 @@
+const CONFIG = window.AK3D_CONFIG || {};
+
+const SUPABASE_URL = CONFIG.SUPABASE_URL;
+const SUPABASE_KEY = CONFIG.SUPABASE_ANON_KEY;
+
+let supabase = null;
+
+if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
 const LS_KEY = '3d_print_prod_system_final_v1';
 let calendarMode = 'week';
 
