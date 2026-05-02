@@ -21,118 +21,220 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
 @media print{.no-print,aside,header{display:none!important}body{background:#fff!important;color:#000!important}.card{background:#fff!important;color:#000!important;border:1px solid #cbd5e1!important}}
 /* ===== PROFESSIONEL FAKTURA PRINT ===== */
 @media print {
+.invoice-page{
+  max-width: 900px;
+  margin: 0 auto;
+}
 
+.invoice-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:2rem;
+  padding-bottom:1.5rem;
+  border-bottom:1px solid #334155;
+  margin-bottom:1.5rem;
+}
+
+.invoice-logo{
+  height:90px;
+  width:auto;
+  object-fit:contain;
+  margin-bottom:.5rem;
+}
+
+.invoice-company-name{
+  font-size:1.4rem;
+  font-weight:800;
+  color:white;
+}
+
+.invoice-meta{
+  text-align:right;
+  color:#cbd5e1;
+  font-size:.9rem;
+}
+
+.invoice-title{
+  font-size:2rem;
+  font-weight:900;
+  color:white;
+  letter-spacing:.08em;
+  margin-bottom:.5rem;
+}
+
+.invoice-two-col{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:1.5rem;
+  margin-bottom:1.25rem;
+}
+
+.invoice-two-col h3{
+  font-weight:700;
+  margin-bottom:.5rem;
+}
+
+.invoice-input{
+  width:100%;
+  margin-bottom:.45rem;
+}
+
+.invoice-info-line{
+  display:flex;
+  justify-content:space-between;
+  gap:1rem;
+  color:#cbd5e1;
+  font-size:.9rem;
+  border-top:1px solid #1e293b;
+  border-bottom:1px solid #1e293b;
+  padding:.75rem 0;
+  margin-bottom:1rem;
+}
+
+.invoice-table{
+  margin-bottom:1rem;
+}
+
+.invoice-total-box{
+  margin-left:auto;
+  width:280px;
+  text-align:right;
+  font-size:.9rem;
+  color:#cbd5e1;
+}
+
+.invoice-grand-total{
+  margin-top:.4rem;
+  padding-top:.4rem;
+  border-top:1px solid #334155;
+  color:white;
+  font-size:1.1rem;
+  font-weight:800;
+}
+
+.invoice-payment{
+  margin-top:1.5rem;
+  font-size:.85rem;
+  color:#cbd5e1;
+  border-top:1px solid #1e293b;
+  padding-top:.75rem;
+}
+
+/* PRINT: faktura på én side */
+@media print {
   @page {
     size: A4 portrait;
-    margin: 8mm;
+    margin: 9mm;
   }
 
   body {
-    background: white !important;
-    color: black !important;
-    visibility: hidden;
-  }
-
-  /* VIS KUN FAKTURA */
-  #tab-invoice,
-  #tab-invoice * {
-    visibility: visible;
-  }
-
-  #tab-invoice {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-  }
-
-  /* Logo fix */
-  #tab-invoice img {
-    display: block !important;
-
+    background:white !important;
+    color:black !important;
   }
 
   body * {
-    visibility: hidden !important;
+    visibility:hidden !important;
   }
 
   #tab-invoice,
   #tab-invoice * {
-    visibility: visible !important;
+    visibility:visible !important;
   }
 
   #tab-invoice {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    padding: 0 !important;
-    background: white !important;
-    color: black !important;
+    position:absolute !important;
+    left:0 !important;
+    top:0 !important;
+    width:100% !important;
+    padding:0 !important;
+    background:white !important;
+    color:black !important;
   }
 
   #tab-invoice > h2,
   .no-print,
   #internalInvoiceInfo {
-    display: none !important;
+    display:none !important;
   }
 
-  #tab-invoice .card {
-    box-shadow: none !important;
-    border: none !important;
-    background: white !important;
-    color: black !important;
-    padding: 0 !important;
-    max-width: 190mm !important;
-    margin: 0 auto !important;
-    transform: scale(1);
-    transform-origin: top center;
+  .invoice-page{
+    width:190mm !important;
+    max-width:190mm !important;
+    margin:0 auto !important;
+    padding:0 !important;
+    background:white !important;
+    color:black !important;
+    border:none !important;
+    box-shadow:none !important;
+    transform:none !important;
+  }
+
+  .invoice-top{
+    padding-bottom:6mm !important;
+    margin-bottom:6mm !important;
+    border-bottom:1px solid #999 !important;
+  }
+
+  .invoice-logo{
+    height:55px !important;
+    width:auto !important;
+  }
+
+  .invoice-company-name,
+  .invoice-title,
+  .invoice-grand-total{
+    color:black !important;
+  }
+
+  .invoice-meta,
+  .invoice-info-line,
+  .invoice-payment,
+  .invoice-total-box{
+    color:black !important;
+  }
+
+  .invoice-two-col{
+    grid-template-columns:1fr 1fr !important;
+    gap:10mm !important;
+    margin-bottom:5mm !important;
   }
 
   #tab-invoice input,
-  #tab-invoice textarea {
-    border: none !important;
-    background: transparent !important;
-    color: black !important;
-    padding: 2px 0 !important;
-    font-size: 11px !important;
-    min-height: unset !important;
-    box-shadow: none !important;
+  #tab-invoice textarea{
+    border:none !important;
+    background:transparent !important;
+    color:black !important;
+    padding:1px 0 !important;
+    font-size:10px !important;
+    min-height:unset !important;
+    box-shadow:none !important;
   }
 
-  #tab-invoice textarea {
-    height: 34px !important;
-    resize: none !important;
+  #tab-invoice textarea{
+    height:24px !important;
+    resize:none !important;
   }
 
-  #tab-invoice .section {
-    font-size: 12px !important;
-    margin-bottom: 4px !important;
-    color: black !important;
+  .invoice-table{
+    font-size:9.5px !important;
+    border-collapse:collapse !important;
   }
 
-  #tab-invoice .table-ui {
-    font-size: 10px !important;
-    width: 100% !important;
-    border-collapse: collapse !important;
+  .invoice-table th,
+  .invoice-table td{
+    padding:3px 4px !important;
+    border:1px solid #bbb !important;
+    color:black !important;
   }
 
-  #tab-invoice .table-ui th,
-  #tab-invoice .table-ui td {
-    padding: 4px 5px !important;
-    border: 1px solid #ccc !important;
-    color: black !important;
+  .invoice-total-box{
+    width:260px !important;
+    font-size:10px !important;
   }
 
-  #tab-invoice img {
-    max-height: 55px !important;
-    width: auto !important;
-    filter: none !important;
-  }
-
-  #tab-invoice .text-slate-300,
-  #tab-invoice .text-slate-400,
-  #tab-invoice .text-white {
-    color: black !important;
+  .invoice-payment{
+    font-size:10px !important;
+    margin-top:6mm !important;
   }
 }
