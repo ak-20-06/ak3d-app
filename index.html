@@ -15,29 +15,32 @@
 <body class="bg-slate-950 text-slate-100">
   <div class="min-h-screen flex">
     <aside class="w-72 bg-slate-900 border-r border-slate-800 no-print">
-      <div style="padding: 16px;">
-  <img src="/ak3d-app/assets/logo/ak3d-logo.png" class="app-logo" alt="AK3D logo">
-</div>
-     
-        </div>
-        <div class="text-xs text-slate-400 mt-3">Ordre: <span id="headerOrderNo">-</span></div>
-        <div class="text-xs text-slate-400">Projekt: <span id="headerProjectName">-</span></div>
-      </div>
+  <div style="padding:16px;">
+    <img src="/ak3d-app/assets/logo/ak3d-logo.png" class="app-logo" alt="AK3D logo">
 
-      <nav class="p-3 space-y-1 text-sm">
-        <button class="navbtn active" data-tab="dashboard">🏠 Dashboard</button>
-        <button class="navbtn" data-tab="orders">📦 Ordrer</button>
-        <button class="navbtn" data-tab="order_status">✅ Ordre status</button>
-        <button class="navbtn" data-tab="items">🧩 Emner</button>
-        <button class="navbtn" data-tab="calendar">📅 Kalender</button>
-        <button class="navbtn" data-tab="printers">🖨️ Printere</button>
-        <button class="navbtn" data-tab="filament">🎨 Filament</button>
-        <button class="navbtn" data-tab="inventory">📦 Lager</button>
-        <button class="navbtn" data-tab="shopping">🛒 Købsliste</button>
-        <button class="navbtn" data-tab="customers">👤 Kunder</button>
-        <button class="navbtn" data-tab="invoice">📄 Faktura</button>
-        <button class="navbtn" data-tab="settings">⚙️ Indstillinger</button>
-      </nav>
+    <div class="text-xs text-slate-400 mt-3">
+      Ordre: <span id="headerOrderNo">-</span>
+    </div>
+    <div class="text-xs text-slate-400">
+      Projekt: <span id="headerProjectName">-</span>
+    </div>
+  </div>
+
+  <nav class="p-3 space-y-1 text-sm">
+    <button class="navbtn active" data-tab="dashboard">🏠 Dashboard</button>
+    <button class="navbtn" data-tab="orders">📦 Ordrer</button>
+    <button class="navbtn" data-tab="order_status">✅ Ordre status</button>
+    <button class="navbtn" data-tab="items">🧩 Emner</button>
+    <button class="navbtn" data-tab="calendar">📅 Kalender</button>
+    <button class="navbtn" data-tab="printers">🖨️ Printere</button>
+    <button class="navbtn" data-tab="filament">🎨 Filament</button>
+    <button class="navbtn" data-tab="inventory">📦 Lager</button>
+    <button class="navbtn" data-tab="shopping">🛒 Købsliste</button>
+    <button class="navbtn" data-tab="customers">👤 Kunder</button>
+    <button class="navbtn" data-tab="invoice">📄 Faktura</button>
+    <button class="navbtn" data-tab="settings">⚙️ Indstillinger</button>
+  </nav>
+ 
 
       <div class="p-3 border-t border-slate-800 grid grid-cols-2 gap-2 text-sm">
         <button id="backupBtn" class="btn bg-indigo-600 hover:bg-indigo-500">Backup</button>
