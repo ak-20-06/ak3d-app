@@ -403,7 +403,7 @@ function getAllPlates(){
         itemName: it.name,
         plateIndex: i,
         totalForItem: d.plates,
-        done: !!state.plateProgress[key]
+       status: state.plateProgress[key] === true ? 'Færdig' : (state.plateProgress[key] || 'Planlagt')
       });
       runningNo++;
     }
@@ -412,7 +412,8 @@ function getAllPlates(){
 }
 
 function setPlateDone(key, done){
-  state.plateProgress[key] = !!done;
+function setPlateStatus(key, status){
+  state.plateProgress[key] = status;
   saveCurrentOrderSnapshot();
   saveState();
   renderOrderStatus();
@@ -432,8 +433,8 @@ function resetAllPlates(){
   renderOrderStatus();
 }
 
-window.togglePlateStatus = function(key){
-  setPlateDone(key, !state.plateProgress[key]);
+window.updatePlateStatus = function(key, status){
+  setPlateStatus(key, status);
 };
 
 function renderOrderStatus(){
@@ -446,7 +447,7 @@ function renderOrderStatus(){
   if(!list || !summary || !bar || !text || !empty) return;
 
   const plates = getAllPlates();
-  const doneCount = plates.filter(p => p.done).length;
+  const doneCount = plates.filter(p => p.status === 'Færdig').length;
   const total = plates.length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
@@ -461,16 +462,25 @@ function renderOrderStatus(){
   }
   empty.classList.add('hidden');
 
-  list.innerHTML = plates.map(p => `
-    <label class="flex items-center gap-3 p-3 rounded-xl border border-slate-700 bg-slate-900">
-      <input type="checkbox" ${p.done ? 'checked' : ''} onchange="togglePlateStatus('${p.key}')">
-      <div class="flex-1">
-        <div class="font-medium">Plade ${p.plateNo}</div>
-        <div class="text-sm text-slate-400">${p.itemName} · plade ${p.plateIndex} af ${p.totalForItem}</div>
-      </div>
-      <div class="text-sm ${p.done ? 'text-green-400' : 'text-slate-400'}">${p.done ? 'Færdig' : 'Ikke færdig'}</div>
-    </label>
-  `).join('');
+ list.innerHTML = plates.map(p => `
+  <div class="flex items-center gap-3 p-3 rounded-xl border border-slate-700 bg-slate-900">
+    <div class="w-24 font-bold text-slate-100">
+      Plade ${p.plateNo}
+    </div>
+
+    <div class="flex-1">
+      <div class="text-sm text-slate-400">Emner</div>
+      <div class="font-medium">${p.itemName}</div>
+      <div class="text-xs text-slate-500">Plade ${p.plateIndex} af ${p.totalForItem}</div>
+    </div>
+
+    <select class="input w-36" onchange="updatePlateStatus('${p.key}', this.value)">
+      <option ${p.status === 'Planlagt' ? 'selected' : ''}>Planlagt</option>
+      <option ${p.status === 'I gang' ? 'selected' : ''}>I gang</option>
+      <option ${p.status === 'Færdig' ? 'selected' : ''}>Færdig</option>
+    </select>
+  </div>
+`).join('');
 }
 
 function rerender(){
