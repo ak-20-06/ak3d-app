@@ -214,3 +214,20 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
     color: black !important;
   }
 }
+.app-logo {
+  height: 55px;
+  width: auto;
+  filter: brightness(0) invert(1); /* hvidt logo på mørk baggrund */
+}
+
+.invoice-logo {
+  height: 75px;
+  width: auto;
+  filter: brightness(0); /* sort logo på hvid faktura */
+}
+
+@media print {
+  .invoice-logo {
+    filter: brightness(0) !important;
+  }
+}
