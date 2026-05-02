@@ -21,6 +21,37 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
 @media print{.no-print,aside,header{display:none!important}body{background:#fff!important;color:#000!important}.card{background:#fff!important;color:#000!important;border:1px solid #cbd5e1!important}}
 /* ===== PROFESSIONEL FAKTURA PRINT ===== */
 @media print {
+
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    visibility: hidden;
+  }
+
+  /* VIS KUN FAKTURA */
+  #tab-invoice,
+  #tab-invoice * {
+    visibility: visible;
+  }
+
+  #tab-invoice {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  /* Logo fix */
+  #tab-invoice img {
+    display: block !important;
+  }
+
+}
   @page {
     size: A4 portrait;
     margin: 8mm;
