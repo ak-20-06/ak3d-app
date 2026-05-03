@@ -1453,7 +1453,9 @@ function renderInvoice() {
     totalSaleEx += saleEx;
     totalSaleInc += saleInc;
   });
-
+  const tbody = byId('invoiceBody');
+  if (!tbody) return;
+  
   const showUnit = byId('showUnitPriceOnInvoice')?.checked ?? true;
 
 document.querySelectorAll('.unit-price-col').forEach(el => {
@@ -1571,7 +1573,7 @@ function setupSupabaseRealtime() {
 
   try {
     sbClient
-      .channel('orders-changes')
+      .channel('orders-changes')F
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
