@@ -153,6 +153,7 @@ function saveState() {
 function setupEvents() {
   document.querySelectorAll('.navbtn').forEach(btn => {
     btn.addEventListener('click', () => {
+      bindChange('showUnitPriceOnInvoice', renderInvoice);
       document.querySelectorAll('.navbtn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
 
@@ -1453,19 +1454,21 @@ function renderInvoice() {
     totalSaleInc += saleInc;
   });
 
-  const tbody = byId('invoiceBody');
+  const showUnit = byId('showUnitPriceOnInvoice')?.checked ?? true;
 
-  if (tbody) {
-    tbody.innerHTML = lines.map(l => `
-      <tr>
-        <td>${esc(l.desc)}</td>
-        <td class="text-right">${l.qty}</td>
-        <td class="text-right">${fmtKr(l.unitEx)}</td>
-        <td class="text-right">${fmtKr(l.unitInc)}</td>
-        <td class="text-right">${fmtKr(l.totalInc)}</td>
-      </tr>
-    `).join('');
-  }
+document.querySelectorAll('.unit-price-col').forEach(el => {
+  el.style.display = showUnit ? '' : 'none';
+});
+
+tbody.innerHTML = lines.map(l => `
+  <tr>
+    <td>${esc(l.desc)}</td>
+    <td class="text-right">${l.qty}</td>
+    <td class="text-right unit-price-col" style="${showUnit ? '' : 'display:none'}">${fmtKr(l.unitEx)}</td>
+    <td class="text-right unit-price-col" style="${showUnit ? '' : 'display:none'}">${fmtKr(l.unitInc)}</td>
+    <td class="text-right">${fmtKr(l.totalInc)}</td>
+  </tr>
+`).join('');
 
   if (byId('invTotalEx')) byId('invTotalEx').textContent = fmtKr(totalSaleEx);
   if (byId('invMomsAmount')) byId('invMomsAmount').textContent = fmtKr(totalSaleInc - totalSaleEx);
