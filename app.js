@@ -958,7 +958,7 @@ function renderInventory() {
   const tbody = byId('partsBody');
   if (!tbody) return;
 
-  const units = num(it.customQty) > 0 ? Math.max(0, num(it.customQty)) : Math.max(0, num(state.globalUnits));
+  const units = Math.max(0, num(state.globalUnits));
 
   tbody.innerHTML = state.parts.map(p => {
     const need = units * num(p.qtyPerUnit);
