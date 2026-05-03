@@ -579,7 +579,7 @@ function getAllPlates() {
         itemName: it.name,
         plateIndex: i,
         totalForItem: d.plates,
-        status: saved === true ? 'Færdig' : saved === false ? 'Planlagt' : (saved || 'Planlagt')
+        status: saved === true ? "Færdig" : saved === false ? "Planlagt" : (saved || "Planlagt")
       });
       runningNo++;
     }
