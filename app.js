@@ -838,7 +838,6 @@ function renderItems() {
         <td class="text-center">${d.plates}</td>
 
         <td><input class="table-input w-20" type="number" value="${num(it.plateHours)}" oninput="updateItemField('${it.id}','plateHours',this.value)"></td>
-        <td><input class="table-input w-20" type="number" value="${num(it.plateMinutes)}" oninput="updateItemField('${it.id}','plateMinutes',this.value)"></td>
 
         <td class="text-center">${fmtKr(priceEx)}</td>
 
