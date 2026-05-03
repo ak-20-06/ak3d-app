@@ -370,6 +370,78 @@
 </section>
 
     </main>
+    <section id="tab-settings" class="view p-6 hidden">
+  <h2 class="title">Indstillinger</h2>
+
+  <div class="card p-4">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div>
+        <label class="label">Elpris pr kWh</label>
+        <input id="setPowerPrice" type="number" step="0.01" class="input">
+      </div>
+
+      <div>
+        <label class="label">Standard printer watt</label>
+        <input id="setDefaultWatt" type="number" class="input">
+      </div>
+
+      <div>
+        <label class="label">Moms %</label>
+        <input id="setMoms" type="number" class="input">
+      </div>
+
+      <div>
+        <label class="label">Standard avance %</label>
+        <input id="setMargin" type="number" class="input">
+      </div>
+
+      <div>
+        <label class="label">Skiftetid pr plade (min)</label>
+        <input id="setSwitchMin" type="number" class="input">
+      </div>
+
+      <div>
+        <label class="label">Maskinslitage (kr/t)</label>
+        <input id="setWear" type="number" class="input">
+      </div>
+
+      <div>
+        <label class="label">Arbejdsløn (kr/t)</label>
+        <input id="setLaborRate" type="number" class="input">
+      </div>
+
+      <div>
+        <label class="label">Timer pr dag standard</label>
+        <input id="setDefaultHours" type="number" class="input">
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <button id="saveSettingsBtn" class="btn bg-green-600 hover:bg-green-500">
+        <div>
+  <label class="label">Strømpris (kr/kWh)</label>
+  <input id="setPowerPrice" type="number" class="input">
+</div>
+
+<div>
+  <label class="label">Standard printer watt</label>
+  <input id="setDefaultWatt" type="number" class="input">
+</div>
+
+<div>
+  <label class="label">Moms (%)</label>
+  <input id="setMoms" type="number" class="input">
+</div>
+
+<div>
+  <label class="label">Avance (%)</label>
+  <input id="setMargin" type="number" class="input">
+</div>
+        Gem indstillinger
+      </button>
+    </div>
+  </div>
+</section>
   </div>
 
   <script src="config.js"></script>
