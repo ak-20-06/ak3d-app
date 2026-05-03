@@ -349,23 +349,19 @@
         <strong>Status:</strong> <span id="invStatus">-</span>
       </div>
     </div>
+  <label class="no-print text-sm flex items-center gap-2 mb-3">
+  <input id="showUnitPriceOnInvoice" type="checkbox" checked>
+  Vis enhedspris på faktura
+</label>
 
     <table class="table-ui invoice-table">
 <thead>
   <tr>
-    <th>Navn</th>
-    <th>Antal</th>
-    <th>Vægt/plade</th>
-    <th>Filament</th>
-    <th>Pr/plade</th>
-    <th>Stk/enhed</th>
-    <th>Total stk</th>
-    <th>Plader</th>
-    <th>Tid t</th>
-    <th>Tid min</th>
-    <th>Pris ex</th>
-    <th>Status</th>
-    <th>✖</th>
+    <th>Beskrivelse</th>
+    <th class="text-right">Antal</th>
+    <th class="text-right">Enhedspris ex moms</th>
+    <th class="text-right">Enhedspris inkl moms</th>
+    <th class="text-right">Linjetotal inkl moms</th>
   </tr>
 </thead>
       <tbody id="invoiceBody"></tbody>
