@@ -822,9 +822,7 @@ function renderItems() {
     return `
       <tr>
         <td><input class="table-input" value="${esc(it.name)}" oninput="updateItemField('${it.id}','name',this.value)"></td>
-
         <td><input class="table-input w-20" type="number" value="${num(it.customQty) || num(state.globalUnits)}" oninput="updateItemField('${it.id}','customQty',this.value)"></td>
-
         <td><input class="table-input w-24" type="number" value="${num(it.weightPlate)}" oninput="updateItemField('${it.id}','weightPlate',this.value)"></td>
 
         <td>
@@ -834,14 +832,12 @@ function renderItems() {
         </td>
 
         <td><input class="table-input w-20" type="number" value="${num(it.piecesPerPlate)}" oninput="updateItemField('${it.id}','piecesPerPlate',this.value)"></td>
-
         <td><input class="table-input w-20" type="number" value="${num(it.multPerUnit)}" oninput="updateItemField('${it.id}','multPerUnit',this.value)"></td>
 
         <td class="text-center">${d.totalPieces}</td>
         <td class="text-center">${d.plates}</td>
 
         <td><input class="table-input w-20" type="number" value="${num(it.plateHours)}" oninput="updateItemField('${it.id}','plateHours',this.value)"></td>
-
         <td><input class="table-input w-20" type="number" value="${num(it.plateMinutes)}" oninput="updateItemField('${it.id}','plateMinutes',this.value)"></td>
 
         <td class="text-center">${fmtKr(priceEx)}</td>
