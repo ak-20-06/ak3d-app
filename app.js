@@ -543,7 +543,9 @@ window.togglePrinterAssign = function (id) {
 };
 
 function itemDerived(it) {
-  const units = Math.max(0, num(state.globalUnits));
+  const units = num(it.customQty) > 0
+  ? Math.max(0, num(it.customQty))
+  : Math.max(0, num(state.globalUnits));
   const totalPieces = units * Math.max(1, num(it.multPerUnit));
   const piecesPerPlate = Math.max(1, num(it.piecesPerPlate));
   const plates = Math.ceil(totalPieces / piecesPerPlate);
