@@ -763,6 +763,7 @@ function addItem() {
   state.items.push({
     id: uid(),
     name,
+    customQty: Math.max(0, Math.floor(num(byId('itemCustomQty')?.value))),
     weightPlate,
     filament: byId('itemFilamentType')?.value || (state.filament[0]?.name || ''),
     status: byId('itemStatus')?.value || 'Planlagt',
@@ -819,6 +820,7 @@ function renderItems() {
     return `
       <tr>
         <td><input class="table-input" value="${esc(it.name)}" oninput="updateItemField('${it.id}','name',this.value)"></td>
+        <td><input class="table-input w-20" type="number" value="${num(it.customQty)}" placeholder="${state.globalUnits || 0}" oninput="updateItemField('${it.id}','customQty',this.value)"></td>
         <td><input class="table-input w-24" type="number" value="${num(it.weightPlate)}" oninput="updateItemField('${it.id}','weightPlate',this.value)"></td>
         <td>
           <select class="table-input" onchange="updateItemField('${it.id}','filament',this.value)">
@@ -946,7 +948,7 @@ function renderInventory() {
   const tbody = byId('partsBody');
   if (!tbody) return;
 
-  const units = Math.max(0, num(state.globalUnits));
+  const units = num(it.customQty) > 0 ? Math.max(0, num(it.customQty)) : Math.max(0, num(state.globalUnits));
 
   tbody.innerHTML = state.parts.map(p => {
     const need = units * num(p.qtyPerUnit);
