@@ -10,6 +10,8 @@ if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
 
 const LS_KEY = '3d_print_prod_system_final_v1';
 let calendarMode = 'week';
+let isHydratingFromCloud = false;
+let cloudSaveTimer = null;
 
 const num = v => Number(v) || 0;
 const fmtKr = v => (Number(v) || 0).toLocaleString('da-DK', {
@@ -80,6 +82,7 @@ function defaultState() {
 window.addEventListener('DOMContentLoaded', () => {
   loadState();
   if (!state.currentOrderId) createNewOrder(false);
+  hydrateFromSupabase();
 
   if (byId('today')) byId('today').textContent = new Date().toLocaleDateString('da-DK');
 
@@ -167,8 +170,220 @@ function loadState() {
 function saveState() {
   normalizeState();
   localStorage.setItem(LS_KEY, JSON.stringify(state));
+  queueSupabaseSave();
 }
 
+
+
+function queueSupabaseSave() {
+  if (!sbClient || isHydratingFromCloud) return;
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => {
+    saveStateToSupabase();
+  }, 500);
+}
+
+async function syncTableRows(table, rows) {
+  if (!sbClient) return;
+  const safeRows = Array.isArray(rows) ? rows : [];
+  try {
+    if (safeRows.length > 0) {
+      const { error: upErr } = await sbClient.from(table).upsert(safeRows, { onConflict: 'id' });
+      if (upErr) {
+        console.warn(`Supabase upsert fejlede for ${table}:`, upErr.message || upErr);
+        return;
+      }
+    }
+
+    const ids = safeRows.map(r => r.id).filter(Boolean);
+    if (ids.length > 0) {
+      const idList = ids.map(id => `"${String(id).replace(/"/g, '\\"')}"`).join(',');
+      const { error: delErr } = await sbClient.from(table).delete().not('id', 'in', `(${idList})`);
+      if (delErr) console.warn(`Supabase oprydning fejlede for ${table}:`, delErr.message || delErr);
+    }
+  } catch (err) {
+    console.warn(`Supabase sync fejl for ${table}:`, err);
+  }
+}
+
+async function saveStateToSupabase() {
+  if (!sbClient || !state.currentOrderId) return;
+  try {
+    const pricing = computePricing();
+    const row = {
+      id: state.currentOrderId,
+      order_no: state.orderNo || '',
+      project_name: state.projectName || '',
+      global_units: Math.max(0, Math.floor(num(state.globalUnits))),
+      status: state.order?.status || 'Tilbud',
+      priority: state.order?.priority || 'Normal',
+      start_date: state.order?.startDate || null,
+      deadline: state.order?.deadline || null,
+      tags: state.order?.tags || '',
+      notes: state.order?.notes || '',
+      customer_name: state.invoice?.customer || '',
+      total_inc: pricing.saleInc || 0,
+      payload: snapshotCurrentOrder(),
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await sbClient.from('orders').upsert(row, { onConflict: 'id' });
+    if (error) {
+      console.warn('Supabase gem fejlede:', error.message || error);
+      return;
+    }
+
+    await syncTableRows('filament', state.filament.map(f => ({
+      id: f.id,
+      name: f.name || '',
+      price: num(f.price),
+      stock_kg: num(f.stockKg),
+      updated_at: new Date().toISOString()
+    })));
+
+    await syncTableRows('inventory', state.parts.map(part => ({
+      id: part.id,
+      name: part.name || '',
+      unit: 'stk',
+      price: num(part.price),
+      qty_per_unit: num(part.qtyPerUnit),
+      stock: num(part.stock),
+      min_stock: 0,
+      updated_at: new Date().toISOString()
+    })));
+
+    await syncTableRows('printers', state.printers.map(pr => ({
+      id: pr.id,
+      name: pr.name || '',
+      watt: num(pr.watt),
+      hours_per_day: num(pr.hoursPerDay),
+      status: pr.status || 'Aktiv',
+      endpoint: pr.endpoint || null,
+      plug_type: pr.plugType || null,
+      service_note: pr.serviceNote || null,
+      updated_at: new Date().toISOString()
+    })));
+
+    await syncTableRows('customers', state.customers.map(c => ({
+      id: c.id,
+      name: c.name || '',
+      addr1: c.addr1 || null,
+      addr2: c.addr2 || null,
+      cvr: c.cvr || null,
+      email: c.email || null,
+      phone: c.phone || null,
+      updated_at: new Date().toISOString()
+    })));
+  } catch (err) {
+    console.warn('Supabase gem fejl:', err);
+  }
+}
+
+async function hydrateFromSupabase() {
+  if (!sbClient) return;
+  try {
+    const { data, error } = await sbClient
+      .from('orders')
+      .select('id, order_no, project_name, global_units, status, priority, start_date, deadline, tags, notes, customer_name, total_inc, payload, updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(200);
+
+    if (error) {
+      console.warn('Supabase load fejlede:', error.message || error);
+      return;
+    }
+    if (!data || data.length === 0) return;
+
+    const fromCloud = data.map(r => {
+      const p = r.payload || {};
+      return {
+        id: r.id,
+        orderNo: p.orderNo || r.order_no || '',
+        projectName: p.projectName || r.project_name || '',
+        globalUnits: num(p.globalUnits ?? r.global_units),
+        order: p.order || {
+          status: r.status || 'Tilbud',
+          priority: r.priority || 'Normal',
+          startDate: r.start_date || '',
+          deadline: r.deadline || '',
+          tags: r.tags || '',
+          notes: r.notes || '',
+          assignedPrinterIds: []
+        },
+        invoice: p.invoice || { customer: r.customer_name || '', addr1: '', addr2: '', invoiceNo: '', terms: '8 dage netto', note: '' },
+        items: Array.isArray(p.items) ? p.items : [],
+        plateProgress: p.plateProgress || {},
+        customer: (p.invoice && p.invoice.customer) || r.customer_name || '',
+        totalInc: num(p.totalInc ?? r.total_inc),
+        savedAt: p.savedAt || r.updated_at || new Date().toISOString()
+      };
+    });
+
+    const [filRes, invRes, printerRes, custRes] = await Promise.all([
+      sbClient.from('filament').select('id, name, price, stock_kg').order('created_at', { ascending: true }),
+      sbClient.from('inventory').select('id, name, price, qty_per_unit, stock').order('created_at', { ascending: true }),
+      sbClient.from('printers').select('id, name, watt, hours_per_day, status, endpoint, plug_type, service_note').order('created_at', { ascending: true }),
+      sbClient.from('customers').select('id, name, addr1, addr2, cvr, email, phone').order('created_at', { ascending: true })
+    ]);
+
+    isHydratingFromCloud = true;
+    const byId = new Map(state.ordersHistory.map(o => [o.id, o]));
+    fromCloud.forEach(o => byId.set(o.id, o));
+    state.ordersHistory = Array.from(byId.values()).sort((a,b) => new Date(b.savedAt||0)-new Date(a.savedAt||0));
+
+    const current = state.currentOrderId && fromCloud.find(o => o.id === state.currentOrderId);
+    const latest = current || fromCloud[0];
+    if (latest) {
+      state.currentOrderId = latest.id;
+      state.orderNo = latest.orderNo;
+      state.projectName = latest.projectName;
+      state.globalUnits = latest.globalUnits || 0;
+      state.order = JSON.parse(JSON.stringify(latest.order || {}));
+      state.invoice = JSON.parse(JSON.stringify(latest.invoice || {}));
+      state.items = JSON.parse(JSON.stringify(latest.items || []));
+      state.plateProgress = JSON.parse(JSON.stringify(latest.plateProgress || {}));
+    }
+    if (!filRes.error && Array.isArray(filRes.data)) {
+      state.filament = filRes.data.map(f => ({ id: f.id, name: f.name || '', price: num(f.price), stockKg: num(f.stock_kg) }));
+    }
+    if (!invRes.error && Array.isArray(invRes.data)) {
+      state.parts = invRes.data.map(part => ({ id: part.id, name: part.name || '', price: num(part.price), qtyPerUnit: Math.max(1, num(part.qty_per_unit) || 1), stock: num(part.stock) }));
+    }
+    if (!printerRes.error && Array.isArray(printerRes.data)) {
+      state.printers = printerRes.data.map(pr => ({
+        id: pr.id,
+        name: pr.name || '',
+        watt: num(pr.watt),
+        hoursPerDay: num(pr.hours_per_day),
+        status: pr.status || 'Aktiv',
+        endpoint: pr.endpoint || '',
+        plugType: pr.plug_type || '',
+        serviceNote: pr.service_note || '',
+        liveWatt: null
+      }));
+    }
+    if (!custRes.error && Array.isArray(custRes.data)) {
+      state.customers = custRes.data.map(c => ({
+        id: c.id,
+        name: c.name || '',
+        addr1: c.addr1 || '',
+        addr2: c.addr2 || '',
+        cvr: c.cvr || '',
+        email: c.email || '',
+        phone: c.phone || ''
+      }));
+    }
+
+    normalizeState();
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    applyUI();
+    console.log(`Supabase sync: hentede ${fromCloud.length} ordre(r).`);
+  } catch (err) {
+    console.warn('Supabase hydrate fejl:', err);
+  } finally {
+    isHydratingFromCloud = false;
+  }
+}
 function setupEvents() {
   document.querySelectorAll('.navbtn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -261,26 +476,33 @@ function setupEvents() {
 function bindClick(id, fn) { byId(id)?.addEventListener('click', fn); }
 function bindInput(id, fn) { byId(id)?.addEventListener('input', fn); }
 function bindChange(id, fn) { byId(id)?.addEventListener('change', fn); }
+function safeRun(label, fn) {
+  try {
+    fn();
+  } catch (err) {
+    console.error(`[AK3D] ${label} fejlede:`, err);
+  }
+}
 
 function applyUI() {
-  renderHeader();
-  populateTopbar();
-  populateOrderFields();
-  populateSettings();
-  populateFilamentSelect();
+  safeRun('renderHeader', renderHeader);
+  safeRun('populateTopbar', populateTopbar);
+  safeRun('populateOrderFields', populateOrderFields);
+  safeRun('populateSettings', populateSettings);
+  safeRun('populateFilamentSelect', populateFilamentSelect);
 
-  renderOrderHistory();
-  renderItems();
-  renderOrderStatus();
-  renderFilament();
-  renderInventory();
-  renderPrinters();
-  renderCustomers();
-  renderDashboard();
-  renderCalendar();
-  renderShopping();
-  renderInvoice();
-  renderPrinterAssignments();
+  safeRun('renderOrderHistory', renderOrderHistory);
+  safeRun('renderItems', renderItems);
+  safeRun('renderOrderStatus', renderOrderStatus);
+  safeRun('renderFilament', renderFilament);
+  safeRun('renderInventory', renderInventory);
+  safeRun('renderPrinters', renderPrinters);
+  safeRun('renderCustomers', renderCustomers);
+  safeRun('renderDashboard', renderDashboard);
+  safeRun('renderCalendar', renderCalendar);
+  safeRun('renderShopping', renderShopping);
+  safeRun('renderInvoice', renderInvoice);
+  safeRun('renderPrinterAssignments', renderPrinterAssignments);
 
   if (byId('inventoryPadMode')) byId('inventoryPadMode').checked = !!state.app.inventoryPadMode;
 
@@ -288,18 +510,18 @@ function applyUI() {
 }
 
 function renderActiveTab(tab) {
-  if (tab === 'dashboard') renderDashboard();
-  if (tab === 'orders') { renderOrderHistory(); renderPrinterAssignments(); }
-  if (tab === 'order_status') renderOrderStatus();
-  if (tab === 'items') renderItems();
-  if (tab === 'calendar') renderCalendar();
-  if (tab === 'printers') { renderPrinters(); renderPrinterAssignments(); }
-  if (tab === 'filament') renderFilament();
-  if (tab === 'inventory') renderInventory();
-  if (tab === 'shopping') renderShopping();
-  if (tab === 'customers') renderCustomers();
-  if (tab === 'invoice') renderInvoice();
-  if (tab === 'settings') populateSettings();
+  if (tab === 'dashboard') safeRun('renderDashboard', renderDashboard);
+  if (tab === 'orders') { safeRun('renderOrderHistory', renderOrderHistory); safeRun('renderPrinterAssignments', renderPrinterAssignments); }
+  if (tab === 'order_status') safeRun('renderOrderStatus', renderOrderStatus);
+  if (tab === 'items') safeRun('renderItems', renderItems);
+  if (tab === 'calendar') safeRun('renderCalendar', renderCalendar);
+  if (tab === 'printers') { safeRun('renderPrinters', renderPrinters); safeRun('renderPrinterAssignments', renderPrinterAssignments); }
+  if (tab === 'filament') safeRun('renderFilament', renderFilament);
+  if (tab === 'inventory') safeRun('renderInventory', renderInventory);
+  if (tab === 'shopping') safeRun('renderShopping', renderShopping);
+  if (tab === 'customers') safeRun('renderCustomers', renderCustomers);
+  if (tab === 'invoice') safeRun('renderInvoice', renderInvoice);
+  if (tab === 'settings') safeRun('populateSettings', populateSettings);
 }
 
 function setVal(id, v) {
@@ -653,21 +875,21 @@ function renderOrderStatus() {
 function rerender() {
   saveCurrentOrderSnapshot();
   saveState();
-  renderHeader();
-  populateTopbar();
-  populateSettings();
-  renderOrderHistory();
-  populateFilamentSelect();
-  renderItems();
-  renderOrderStatus();
-  renderFilament();
-  renderInventory();
-  renderPrinters();
-  renderDashboard();
-  renderCalendar();
-  renderShopping();
-  renderInvoice();
-  renderPrinterAssignments();
+  safeRun('renderHeader', renderHeader);
+  safeRun('populateTopbar', populateTopbar);
+  safeRun('populateSettings', populateSettings);
+  safeRun('renderOrderHistory', renderOrderHistory);
+  safeRun('populateFilamentSelect', populateFilamentSelect);
+  safeRun('renderItems', renderItems);
+  safeRun('renderOrderStatus', renderOrderStatus);
+  safeRun('renderFilament', renderFilament);
+  safeRun('renderInventory', renderInventory);
+  safeRun('renderPrinters', renderPrinters);
+  safeRun('renderDashboard', renderDashboard);
+  safeRun('renderCalendar', renderCalendar);
+  safeRun('renderShopping', renderShopping);
+  safeRun('renderInvoice', renderInvoice);
+  safeRun('renderPrinterAssignments', renderPrinterAssignments);
 }
 
 function addItem() {
@@ -734,7 +956,12 @@ function renderItems() {
         <td><input class="table-input w-20" type="number" value="${num(it.multPerUnit)}" oninput="updateItemField('${it.id}','multPerUnit',this.value)"></td>
         <td class="text-center">${d.totalPieces}</td>
         <td class="text-center">${d.plates}</td>
-        <td><input class="table-input w-20" type="number" value="${num(it.plateHours)}" oninput="updateItemField('${it.id}','plateHours',this.value)"></td>
+        <td>
+          <div class="flex gap-1">
+            <input class="table-input w-16" type="number" value="${num(it.plateHours)}" oninput="updateItemField('${it.id}','plateHours',this.value)" title="Timer">
+            <input class="table-input w-16" type="number" value="${num(it.plateMinutes)}" oninput="updateItemField('${it.id}','plateMinutes',this.value)" title="Minutter">
+          </div>
+        </td>
         <td class="text-center">${fmtKr(priceEx)}</td>
         <td><select class="table-input" onchange="updateItemField('${it.id}','status',this.value)">${['Planlagt', 'I gang', 'Pauset', 'Færdig'].map(s => `<option ${it.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
         <td class="text-center"><button class="table-btn danger" onclick="removeItem('${it.id}')">✖</button></td>
@@ -1235,11 +1462,13 @@ function setupSupabaseRealtime() {
     console.log('Supabase ikke aktiv – app kører kun localStorage');
     return;
   }
+  testSupabaseConnection();
   try {
     sbClient
       .channel('orders-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
         console.log('Supabase ændring:', payload);
+        hydrateFromSupabase();
       })
       .subscribe();
   } catch (err) {
@@ -1247,6 +1476,19 @@ function setupSupabaseRealtime() {
   }
 }
 
+async function testSupabaseConnection() {
+  if (!sbClient) return;
+  try {
+    const { error } = await sbClient.from('orders').select('id', { head: true, count: 'exact' }).limit(1);
+    if (error) {
+      console.warn('Supabase forbundet, men tabel/adgang fejlede:', error.message || error);
+      return;
+    }
+    console.log('Supabase forbindelse OK: orders-tabellen kan læses.');
+  } catch (err) {
+    console.warn('Supabase forbindelse fejlede:', err);
+  }
+}
 window.AK3D_DEBUG = {
   get state() { return state; },
   sbClient,
