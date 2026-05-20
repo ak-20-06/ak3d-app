@@ -3,20 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  
+
   <title>AK3D Produktionssystem</title>
-  
+
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
   <link rel="stylesheet" href="styles.css">
 </head>
 
 <body class="bg-slate-950 text-slate-100">
-  <div class="min-h-screen flex">
-    <aside class="w-72 bg-slate-900 border-r border-slate-800 no-print">
-  <div style="padding:16px;">
-    <img src="/ak3d-app/assets/logo/ak3d-logo.png" class="app-logo" alt="AK3D logo">
+  <div class="app-shell">
+    <aside id="appSidebar" class="sidebar no-print">
+  <div class="p-4">
+    <img src="assets/logo/ak3d-logo.png" class="app-logo" alt="AK3D logo">
 
     <div class="text-xs text-slate-400 mt-3">
       Ordre: <span id="headerOrderNo">-</span>
@@ -26,39 +24,41 @@
     </div>
   </div>
 
-  <nav class="p-3 space-y-1 text-sm">
-    <button class="navbtn active" data-tab="dashboard">🏠 Dashboard</button>
-    <button class="navbtn" data-tab="orders">📦 Ordrer</button>
-    <button class="navbtn" data-tab="order_status">✅ Ordre status</button>
-    <button class="navbtn" data-tab="items">🧩 Emner</button>
-    <button class="navbtn" data-tab="calendar">📅 Kalender</button>
-    <button class="navbtn" data-tab="printers">🖨️ Printere</button>
-    <button class="navbtn" data-tab="filament">🎨 Filament</button>
-    <button class="navbtn" data-tab="inventory">📦 Lager</button>
-    <button class="navbtn" data-tab="shopping">🛒 Købsliste</button>
-    <button class="navbtn" data-tab="customers">👤 Kunder</button>
-    <button class="navbtn" data-tab="invoice">📄 Faktura</button>
-    <button class="navbtn" data-tab="settings">⚙️ Indstillinger</button>
+  <nav id="appNavigation" class="app-navigation p-3 space-y-1 text-sm">
+    <button type="button" class="navbtn active" data-tab="dashboard" onclick="activateTab('dashboard')">🏠 Dashboard</button>
+    <button type="button" class="navbtn" data-tab="orders" onclick="activateTab('orders')">📦 Ordrer</button>
+    <button type="button" class="navbtn" data-tab="order_status" onclick="activateTab('order_status')">✅ Ordre status</button>
+    <button type="button" class="navbtn" data-tab="items" onclick="activateTab('items')">🧩 Emner</button>
+    <button type="button" class="navbtn" data-tab="calendar" onclick="activateTab('calendar')">📅 Kalender</button>
+    <button type="button" class="navbtn" data-tab="printers" onclick="activateTab('printers')">🖨️ Printere</button>
+    <button type="button" class="navbtn" data-tab="filament" onclick="activateTab('filament')">🎨 Filament</button>
+    <button type="button" class="navbtn" data-tab="inventory" onclick="activateTab('inventory')">📦 Lager</button>
+    <button type="button" class="navbtn" data-tab="shopping" onclick="activateTab('shopping')">🛒 Købsliste</button>
+    <button type="button" class="navbtn" data-tab="customers" onclick="activateTab('customers')">👤 Kunder</button>
+    <button type="button" class="navbtn" data-tab="invoice" onclick="activateTab('invoice')">📄 Faktura</button>
+    <button type="button" class="navbtn" data-tab="settings" onclick="activateTab('settings')">⚙️ Indstillinger</button>
   </nav>
- 
 
-      <div class="p-3 border-t border-slate-800 grid grid-cols-2 gap-2 text-sm">
-        <button id="backupBtn" class="btn bg-indigo-600 hover:bg-indigo-500">Backup</button>
+
+      <div class="sidebar-actions">
+        <button type="button" id="backupBtn" class="btn bg-indigo-600 hover:bg-indigo-500">Backup</button>
         <label for="restoreFile" class="btn bg-slate-700 hover:bg-slate-600 cursor-pointer text-center">Import</label>
         <input id="restoreFile" type="file" accept="application/json" class="hidden">
-        <button id="exportCSVBtn" class="btn bg-blue-600 hover:bg-blue-500">CSV</button>
-        <button id="printBtn" class="btn bg-green-600 hover:bg-green-500">PDF</button>
+        <button type="button" id="exportCSVBtn" class="btn bg-blue-600 hover:bg-blue-500">CSV</button>
+        <button type="button" id="printBtn" class="btn bg-green-600 hover:bg-green-500">PDF</button>
       </div>
     </aside>
+    <button type="button" id="menuBackdrop" class="menu-backdrop no-print" aria-label="Luk menu"></button>
 
-    <main class="flex-1">
-      <header class="p-4 border-b border-slate-800 bg-slate-950 no-print">
-        
+    <main class="main-content">
+      <header class="app-header no-print">
+
 
         <div class="flex flex-wrap items-end gap-3">
+          <button type="button" id="menuToggleBtn" class="menu-toggle" aria-expanded="false" aria-controls="appSidebar">☰ Menu</button>
           <div>
             <label class="label">Projekt</label>
-            <input id="projectName" class="input min-w-[240px]" placeholder="Skriv projektnavn">
+            <input type="text" id="projectName" class="input min-w-[240px]" placeholder="Skriv projektnavn">
           </div>
           <div>
             <label class="label">Enheder</label>
@@ -66,13 +66,14 @@
           </div>
           <div>
             <label class="label">Ordrenr.</label>
-            <input id="orderNo" class="input w-28" readonly>
+            <input type="text" id="orderNo" class="input w-28" readonly>
           </div>
           <div class="text-sm text-slate-400 pb-2">Dato: <span id="today"></span></div>
           <div class="text-sm text-slate-400 pb-2" id="momsDisplay"></div>
+          <div class="text-sm text-slate-400 pb-2" id="saveStatus">Gemmer lokalt</div>
           <div class="ml-auto flex gap-2">
-            <button id="newOrderBtnTop" class="btn bg-emerald-600 hover:bg-emerald-500">Ny ordre</button>
-            <button id="saveBtn" class="btn bg-indigo-600 hover:bg-indigo-500">Gem</button>
+            <button type="button" id="newOrderBtnTop" class="btn bg-emerald-600 hover:bg-emerald-500">Ny ordre</button>
+            <button type="button" id="saveBtn" class="btn bg-indigo-600 hover:bg-indigo-500">Gem</button>
           </div>
         </div>
       </header>
@@ -101,21 +102,23 @@
             <div><label class="label">Deadline</label><input id="orderDeadline" type="date" class="input"></div>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-            <div><label class="label">Tags</label><input id="orderTags" class="input" placeholder="fx PLA, sort"></div>
+            <div><label class="label">Tags</label><input type="text" id="orderTags" class="input" placeholder="fx PLA, sort"></div>
             <div><label class="label">Tildelte printere</label><div id="orderPrinterAssignments" class="input min-h-[44px] flex flex-wrap gap-2 items-center"></div></div>
           </div>
           <div class="mt-3"><label class="label">Noter</label><textarea id="orderNotes" rows="4" class="input w-full"></textarea></div>
         </div>
         <div class="card p-4">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
-            <input id="orderSearch" class="input" placeholder="Søg ordre/projekt/kunde">
+            <input type="text" id="orderSearch" class="input" placeholder="Søg ordre/projekt/kunde">
             <select id="orderStatusFilter" class="input"><option value="">Alle statusser</option><option>Tilbud</option><option>Godkendt</option><option>Planlagt</option><option>I produktion</option><option>Færdig</option><option>Leveret</option><option>Faktureret</option></select>
-            <button id="newOrderBtn" class="btn bg-emerald-600 hover:bg-emerald-500">Ny ordre</button>
-            <button id="cloneOrderBtn" class="btn bg-blue-600 hover:bg-blue-500">Kopiér ordre</button>
+            <button type="button" id="newOrderBtn" class="btn bg-emerald-600 hover:bg-emerald-500">Ny ordre</button>
+            <button type="button" id="cloneOrderBtn" class="btn bg-blue-600 hover:bg-blue-500">Kopiér ordre</button>
           </div>
           <div class="overflow-x-auto">
             <table class="table-ui">
-              <tr><th>Ordrenr.</th><th>Projekt</th><th>Kunde</th><th>Status</th><th>Deadline</th><th class="text-right">Total</th><th class="text-right">Handling</th></tr></thead>
+              <thead>
+                <tr><th>Ordrenr.</th><th>Projekt</th><th>Kunde</th><th>Status</th><th>Deadline</th><th class="text-right">Total</th><th class="text-right">Handling</th></tr>
+              </thead>
               <tbody id="orderHistoryBody"></tbody>
             </table>
           </div>
@@ -126,7 +129,7 @@
         <h2 class="title">Emner</h2>
         <div class="card p-4 mb-4">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input id="itemName" class="input" placeholder="Navn">
+            <input type="text" id="itemName" class="input" placeholder="Navn">
             <input id="itemWeightPlate" type="number" class="input" placeholder="Vægt pr. plade (g)">
             <input id="itemCustomQty" type="number" class="input" placeholder="Antal for dette emne">
             <select id="itemFilamentType" class="input"></select>
@@ -137,33 +140,32 @@
             <input id="itemPlateMinutes" type="number" class="input" placeholder="Tid pr. plade (min)">
           </div>
           <div class="mt-3 flex gap-2">
-            <button id="addItemBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj emne</button>
-            <button id="clearItemBtn" class="btn bg-slate-700 hover:bg-slate-600">Ryd</button>
+            <button type="button" id="addItemBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj emne</button>
+            <button type="button" id="clearItemBtn" class="btn bg-slate-700 hover:bg-slate-600">Ryd</button>
           </div>
         </div>
         <div class="card p-4 overflow-x-auto">
           <div class="text-xs text-slate-400 mb-2">Du kan efterredigere direkte i tabellen.</div>
           <table class="table-ui">
-            <table class="table-ui">
-  <thead>
-    <tr>
-      <th>Navn</th>
-      <th>Antal</th>
-      <th>Vægt/plade</th>
-      <th>Filament</th>
-      <th>Pr/plade</th>
-      <th>Stk/enhed</th>
-      <th>Total stk</th>
-      <th>Plader</th>
-      <th>Tid t</th>
-      <th>Tid min</th>
-      <th>Pris ex</th>
-      <th>Status</th>
-      <th>✖</th>
-    </tr>
-  </thead>
-  <tbody id="itemsBody"></tbody>
-</table>
+            <thead>
+              <tr>
+                <th>Navn</th>
+                <th>Antal</th>
+                <th>Vægt/plade</th>
+                <th>Filament</th>
+                <th>Pr/plade</th>
+                <th>Stk/enhed</th>
+                <th>Total stk</th>
+                <th>Plader</th>
+                <th>Tid t</th>
+                <th>Tid min</th>
+                <th>Pris ex</th>
+                <th>Status</th>
+                <th>✖</th>
+              </tr>
+            </thead>
+            <tbody id="itemsBody"></tbody>
+          </table>
         </div>
       </section>
 
@@ -176,12 +178,12 @@
               <div id="orderStatusSummary" class="text-lg font-bold">0 / 0 plader færdige</div>
             </div>
             <div class="flex gap-2 no-print">
-              <button id="markAllPlatesDoneBtn" class="btn bg-green-600 hover:bg-green-500">Alle færdige</button>
-              <button id="resetAllPlatesBtn" class="btn bg-red-600 hover:bg-red-500">Nulstil</button>
+              <button type="button" id="markAllPlatesDoneBtn" class="btn bg-green-600 hover:bg-green-500">Alle færdige</button>
+              <button type="button" id="resetAllPlatesBtn" class="btn bg-red-600 hover:bg-red-500">Nulstil</button>
             </div>
           </div>
           <div class="mt-4 w-full h-5 bg-slate-800 rounded-full overflow-hidden">
-            <div id="orderStatusProgressBar" class="h-full bg-green-500 rounded-full" style="width:0%"></div>
+            <div id="orderStatusProgressBar" class="h-full bg-green-500 rounded-full"></div>
           </div>
           <div id="orderStatusProgressText" class="mt-2 text-sm text-slate-300">0%</div>
         </div>
@@ -197,9 +199,9 @@
         <div class="flex flex-wrap justify-between gap-3 items-center mb-4">
           <h2 class="title mb-0">Kalender</h2>
           <div class="flex gap-2">
-            <button class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="day">Dag</button>
-            <button class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="week">Uge</button>
-            <button class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="month">Måned</button>
+            <button type="button" class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="day">Dag</button>
+            <button type="button" class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="week">Uge</button>
+            <button type="button" class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="month">Måned</button>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -214,16 +216,16 @@
         <h2 class="title">Printere</h2>
         <div class="card p-4 mb-4">
           <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <input id="printerName" class="input" placeholder="Navn">
+            <input type="text" id="printerName" class="input" placeholder="Navn">
             <input id="printerWatt" type="number" class="input" placeholder="Watt">
             <input id="printerHoursPerDay" type="number" class="input" placeholder="Timer/dag">
             <select id="printerStatus" class="input"><option>Aktiv</option><option>Pauset</option><option>Service</option></select>
-            <button id="addPrinterBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj printer</button>
+            <button type="button" id="addPrinterBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj printer</button>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-            <input id="printerEndpoint" class="input" placeholder="Smart stik endpoint">
+            <input type="text" id="printerEndpoint" class="input" placeholder="Smart stik endpoint">
             <select id="printerPlugType" class="input"><option value="">Ingen smart stik</option><option value="shelly">Shelly</option><option value="generic">Generic JSON</option></select>
-            <input id="printerServiceNote" class="input" placeholder="Service note">
+            <input type="text" id="printerServiceNote" class="input" placeholder="Service note">
           </div>
         </div>
         <div class="card p-4 overflow-x-auto">
@@ -238,10 +240,10 @@
         <h2 class="title">Filament</h2>
         <div class="card p-4 mb-4">
           <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input id="filName" class="input" placeholder="Navn">
+            <input type="text" id="filName" class="input" placeholder="Navn">
             <input id="filPrice" type="number" class="input" placeholder="Kg pris">
             <input id="filStock" type="number" class="input" placeholder="Lager (kg)">
-            <button id="addFilBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj filamenttype</button>
+            <button type="button" id="addFilBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj filamenttype</button>
           </div>
         </div>
         <div class="card p-4 overflow-x-auto">
@@ -259,11 +261,11 @@
         </div>
         <div class="card p-4 mb-4">
           <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <input id="partName" class="input" placeholder="Varenavn">
+            <input type="text" id="partName" class="input" placeholder="Varenavn">
             <input id="partPrice" type="number" class="input" placeholder="Pris pr enhed">
             <input id="partQtyPerUnit" type="number" class="input" placeholder="Antal pr enhed">
             <input id="partStock" type="number" class="input" placeholder="Lager">
-            <button id="addPartBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj vare</button>
+            <button type="button" id="addPartBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj vare</button>
           </div>
         </div>
         <div class="card p-4 overflow-x-auto">
@@ -286,14 +288,14 @@
         <h2 class="title">Kunder</h2>
         <div class="card p-4 mb-4">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <input id="custName" class="input" placeholder="Kundenavn">
-            <input id="custAddr1" class="input" placeholder="Adresse">
-            <input id="custAddr2" class="input" placeholder="Postnr. og by">
-            <input id="custCVR" class="input" placeholder="CVR">
-            <input id="custEmail" class="input" placeholder="E-mail">
-            <input id="custPhone" class="input" placeholder="Telefon">
+            <input type="text" id="custName" class="input" placeholder="Kundenavn">
+            <input type="text" id="custAddr1" class="input" placeholder="Adresse">
+            <input type="text" id="custAddr2" class="input" placeholder="Postnr. og by">
+            <input type="text" id="custCVR" class="input" placeholder="CVR">
+            <input type="text" id="custEmail" class="input" placeholder="E-mail">
+            <input type="text" id="custPhone" class="input" placeholder="Telefon">
           </div>
-          <div class="mt-3"><button id="addCustomerBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj kunde</button></div>
+          <div class="mt-3"><button type="button" id="addCustomerBtn" class="btn bg-blue-600 hover:bg-blue-500">Tilføj kunde</button></div>
         </div>
         <div class="card p-4 overflow-x-auto">
           <table class="table-ui">
@@ -309,7 +311,7 @@
   <div class="invoice-page card p-8">
     <div class="invoice-top">
       <div class="invoice-company">
-       <img src="/ak3d-app/assets/logo/ak3d-logo.png" class="invoice-logo" alt="AK3D logo">
+       <img src="assets/logo/ak3d-logo.png" class="invoice-logo" alt="AK3D logo">
 
 
         <div>CVR: 12345678</div>
@@ -326,15 +328,15 @@
     <div class="invoice-two-col">
       <div>
         <h3>Kunde</h3>
-        <input id="invCustomer" class="input invoice-input" placeholder="Kundenavn">
-        <input id="invAddr1" class="input invoice-input" placeholder="Adresse">
-        <input id="invAddr2" class="input invoice-input" placeholder="Postnr. og by">
+        <input type="text" id="invCustomer" class="input invoice-input" placeholder="Kundenavn">
+        <input type="text" id="invAddr1" class="input invoice-input" placeholder="Adresse">
+        <input type="text" id="invAddr2" class="input invoice-input" placeholder="Postnr. og by">
       </div>
 
       <div>
         <h3>Fakturainfo</h3>
-        <input id="invInvoiceNo" class="input invoice-input" placeholder="Fakturanr.">
-        <input id="invTerms" class="input invoice-input" placeholder="Betalingsbetingelser">
+        <input type="text" id="invInvoiceNo" class="input invoice-input" placeholder="Fakturanr.">
+        <input type="text" id="invTerms" class="input invoice-input" placeholder="Betalingsbetingelser">
         <textarea id="invNote" class="input invoice-input" rows="2" placeholder="Bemærkning"></textarea>
       </div>
     </div>
@@ -382,7 +384,6 @@
   </div>
 </section>
 
-    </main>
     <section id="tab-settings" class="view p-6 hidden">
   <h2 class="title">Indstillinger</h2>
 
@@ -430,34 +431,15 @@
     </div>
 
     <div class="mt-3">
-      <button id="saveSettingsBtn" class="btn bg-green-600 hover:bg-green-500">
-        <div>
-  <label class="label">Strømpris (kr/kWh)</label>
-  <input id="setPowerPrice" type="number" class="input">
-</div>
-
-<div>
-  <label class="label">Standard printer watt</label>
-  <input id="setDefaultWatt" type="number" class="input">
-</div>
-
-<div>
-  <label class="label">Moms (%)</label>
-  <input id="setMoms" type="number" class="input">
-</div>
-
-<div>
-  <label class="label">Avance (%)</label>
-  <input id="setMargin" type="number" class="input">
-</div>
-        Gem indstillinger
-      </button>
+      <button type="button" id="saveSettingsBtn" class="btn bg-green-600 hover:bg-green-500">Gem indstillinger</button>
     </div>
   </div>
 </section>
+    </main>
   </div>
 
   <script src="config.js"></script>
   <script src="app.js"></script>
+  <script src="github-hotfix.js"></script>
 </body>
 </html>
