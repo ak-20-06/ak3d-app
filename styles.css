@@ -100,6 +100,8 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
     height: 200px !important;
     width: auto !important;
     margin-bottom: 5mm !important;
+    filter: brightness(0) !important;
+    mix-blend-mode: normal !important;
   }
 
   .invoice-company-name {
@@ -243,5 +245,6 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
 .invoice-logo {
   height: 75px;
   width: auto;
-  filter: brightness(0); /* sort på faktura */
+  filter: brightness(0) invert(1);
+  mix-blend-mode: difference;
 }
