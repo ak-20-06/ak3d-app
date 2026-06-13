@@ -390,6 +390,13 @@ function setupEvents() {
     });
   });
   bindClick('calendarAddChangeTimeBtn', addCalendarChangeTime);
+  bindInput('calendarNewChangeTime', updateCalendarAddButton);
+  bindChange('calendarNewChangeTime', updateCalendarAddButton);
+  byId('calendarNewChangeTime')?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    addCalendarChangeTime();
+  });
   bindClick('calendarRefreshBtn', saveCalendarSettings);
   bindChange('calendarStartDate', saveCalendarSettings);
   bindChange('calendarStartTime', saveCalendarSettings);
@@ -1423,10 +1430,23 @@ function computeSchedule() {
 function addCalendarChangeTime() {
   const input = byId('calendarNewChangeTime');
   const time = input?.value;
-  if (!isValidTime(time)) return;
-  state.settings.calendarChangeTimes = [...new Set([...state.settings.calendarChangeTimes, time])].sort();
+  if (!isValidTime(time)) {
+    setCalendarTimeStatus('Vælg først et gyldigt tidspunkt.', true);
+    input?.focus();
+    return;
+  }
+  if (state.settings.calendarChangeTimes.includes(time)) {
+    setCalendarTimeStatus(`${time} findes allerede. Vælg et andet tidspunkt.`, true);
+    input?.focus();
+    return;
+  }
+  state.settings.calendarChangeTimes = [...state.settings.calendarChangeTimes, time].sort();
+  input.value = '';
+  updateCalendarAddButton();
   saveState();
   renderCalendar();
+  setCalendarTimeStatus(`${time} er tilføjet som skiftetid.`);
+  input.focus();
 }
 
 window.removeCalendarChangeTime = function (time) {
@@ -1437,7 +1457,21 @@ window.removeCalendarChangeTime = function (time) {
   state.settings.calendarChangeTimes = state.settings.calendarChangeTimes.filter(value => value !== time);
   saveState();
   renderCalendar();
+  setCalendarTimeStatus(`${time} er fjernet.`);
 };
+
+function updateCalendarAddButton() {
+  const input = byId('calendarNewChangeTime');
+  const button = byId('calendarAddChangeTimeBtn');
+  if (button) button.disabled = !isValidTime(input?.value);
+}
+
+function setCalendarTimeStatus(text, isError = false) {
+  const status = byId('calendarTimeStatus');
+  if (!status) return;
+  status.textContent = text;
+  status.classList.toggle('calendar-time-error', isError);
+}
 
 function saveCalendarSettings() {
   const startDate = byId('calendarStartDate')?.value || localDateKey(new Date());
@@ -1511,6 +1545,7 @@ function renderCalendar() {
   setVal('calendarStartDate', state.settings.calendarStartDate || localDateKey(new Date()));
   setVal('calendarStartTime', state.settings.calendarStartTime);
   if (byId('calendarAllowWeekends')) byId('calendarAllowWeekends').checked = !!state.settings.calendarAllowWeekends;
+  updateCalendarAddButton();
   renderCalendarChangeTimes();
 
   const sched = computeSchedule();
