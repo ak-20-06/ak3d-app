@@ -229,10 +229,11 @@
               <div class="text-sm text-slate-400">Printerne må gerne køre om natten. En færdig plade venter til næste valgte skiftetid.</div>
             </div>
             <div class="calendar-change-add">
-              <input id="calendarNewChangeTime" type="time" class="input" value="08:00" aria-label="Ny skiftetid">
-              <button type="button" id="calendarAddChangeTimeBtn" class="btn bg-emerald-600 hover:bg-emerald-500">Tilføj tid</button>
+              <input id="calendarNewChangeTime" type="time" class="input" aria-label="Ny skiftetid">
+              <button type="button" id="calendarAddChangeTimeBtn" class="btn bg-emerald-600 hover:bg-emerald-500" disabled>Tilføj skiftetid</button>
             </div>
           </div>
+          <div id="calendarTimeStatus" class="calendar-time-status" role="status" aria-live="polite">Vælg et tidspunkt og tryk på Tilføj skiftetid.</div>
           <div id="calendarChangeTimes" class="calendar-time-chips"></div>
         </div>
 
