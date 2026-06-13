@@ -196,20 +196,54 @@
       </section>
 
       <section id="tab-calendar" class="view p-6 hidden">
-        <div class="flex flex-wrap justify-between gap-3 items-center mb-4">
+        <div class="calendar-toolbar mb-4">
           <h2 class="title mb-0">Kalender</h2>
-          <div class="flex gap-2">
-            <button type="button" class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="day">Dag</button>
+          <div class="calendar-modes" role="group" aria-label="Kalendervisning">
+            <button type="button" class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="printer">Printere</button>
+            <button type="button" class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="day">Dage</button>
             <button type="button" class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="week">Uge</button>
             <button type="button" class="modeBtn btn bg-slate-700 hover:bg-slate-600" data-mode="month">Måned</button>
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+
+        <div class="calendar-settings card p-4 mb-4">
+          <div class="calendar-settings-grid">
+            <div>
+              <label class="label" for="calendarStartDate">Planlæg fra dato</label>
+              <input id="calendarStartDate" type="date" class="input">
+            </div>
+            <div>
+              <label class="label" for="calendarStartTime">Første print starter</label>
+              <input id="calendarStartTime" type="time" class="input">
+            </div>
+            <label class="calendar-weekend-toggle">
+              <input id="calendarAllowWeekends" type="checkbox">
+              <span>Pladeskift i weekenden</span>
+            </label>
+            <button type="button" id="calendarRefreshBtn" class="btn bg-indigo-600 hover:bg-indigo-500">Opdater plan</button>
+          </div>
+
+          <div class="calendar-change-editor">
+            <div>
+              <div class="section mb-1">Tidspunkter hvor plader kan skiftes</div>
+              <div class="text-sm text-slate-400">Printerne må gerne køre om natten. En færdig plade venter til næste valgte skiftetid.</div>
+            </div>
+            <div class="calendar-change-add">
+              <input id="calendarNewChangeTime" type="time" class="input" value="08:00" aria-label="Ny skiftetid">
+              <button type="button" id="calendarAddChangeTimeBtn" class="btn bg-emerald-600 hover:bg-emerald-500">Tilføj tid</button>
+            </div>
+          </div>
+          <div id="calendarChangeTimes" class="calendar-time-chips"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div class="card p-4"><div class="muted">Startdato</div><div id="calendarStart" class="big">-</div></div>
           <div class="card p-4"><div class="muted">Forventet slutdato</div><div id="calendarFinish" class="big">-</div></div>
           <div class="card p-4"><div class="muted">Tildelte printere</div><div id="calendarPrinters" class="big">-</div></div>
+          <div class="card p-4"><div class="muted">Ventetid på skift</div><div id="calendarWait" class="big">0 t</div></div>
         </div>
-        <div class="card p-4" id="calendarMount"></div>
+        <div id="calendarWarnings" class="calendar-warnings hidden"></div>
+        <div class="card p-4 calendar-output" id="calendarMount"></div>
       </section>
 
       <section id="tab-printers" class="view p-6 hidden">
@@ -440,6 +474,5 @@
 
   <script src="config.js"></script>
   <script src="app.js"></script>
-  <script src="github-hotfix.js"></script>
 </body>
 </html>
