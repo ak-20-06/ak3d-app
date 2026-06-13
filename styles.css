@@ -36,6 +36,9 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-seri
 .calendar-weekend-toggle input{width:1.1rem;height:1.1rem;accent-color:#4f46e5}
 .calendar-change-editor{display:flex;align-items:end;justify-content:space-between;gap:1rem;margin-top:1rem;padding-top:1rem;border-top:1px solid #1e293b}
 .calendar-change-add{display:grid;grid-template-columns:8rem auto;gap:.5rem;align-items:end}
+.calendar-change-add .btn:disabled{cursor:not-allowed;opacity:.45}
+.calendar-time-status{margin-top:.75rem;color:#86efac;font-size:.82rem;font-weight:700}
+.calendar-time-status.calendar-time-error{color:#fca5a5}
 .calendar-time-chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.75rem;min-height:2.25rem}
 .calendar-time-chip{display:inline-flex;align-items:center;gap:.5rem;border:1px solid #3b82f6;background:#172554;color:#dbeafe;border-radius:.5rem;padding:.4rem .45rem .4rem .65rem;font-weight:700;font-variant-numeric:tabular-nums}
 .calendar-time-chip button{display:grid;place-items:center;width:1.5rem;height:1.5rem;border:0;background:#1e3a8a;color:#fff;border-radius:.35rem;cursor:pointer;font-size:1.1rem;line-height:1}
