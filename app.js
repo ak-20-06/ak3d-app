@@ -2,14 +2,13 @@ const CONFIG = window.AK3D_CONFIG || {};
 
 const SUPABASE_URL = CONFIG.SUPABASE_URL;
 const SUPABASE_KEY = CONFIG.SUPABASE_ANON_KEY;
+const SUPABASE_CDN_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 
 let sbClient = null;
-if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
-  sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-}
+let supabaseClientPromise = null;
 
 const LS_KEY = '3d_print_prod_system_final_v1';
-let calendarMode = 'week';
+let calendarMode = 'printer';
 
 const num = v => Number(v) || 0;
 const fmtKr = v => (Number(v) || 0).toLocaleString('da-DK', {
@@ -27,8 +26,13 @@ const esc = s => String(s ?? '')
   .replace(/"/g, '&quot;');
 const byId = id => document.getElementById(id);
 const uid = () => (crypto.randomUUID?.() || Math.random().toString(36).slice(2, 11));
+const SUPABASE_STATE_ID = '00000000-0000-4000-8000-000000000001';
+const SUPABASE_STATE_ORDER_NO = '__AK3D_APP_STATE__';
+const SUPABASE_TIMEOUT_MS = 5000;
 
 let state = defaultState();
+let remoteSaveTimer = null;
+let initialRemoteSyncDone = false;
 
 function defaultState() {
   return {
@@ -62,7 +66,11 @@ function defaultState() {
       switchMin: 5,
       wearPerHour: 5,
       laborRate: 250,
-      defaultHoursPerDay: 16
+      defaultHoursPerDay: 16,
+      calendarStartDate: '',
+      calendarStartTime: '08:00',
+      calendarChangeTimes: ['08:00', '12:00', '16:00', '20:00'],
+      calendarAllowWeekends: true
     },
     filament: [
       { id: uid(), name: 'PLA', price: 200, stockKg: 0 },
@@ -78,7 +86,7 @@ function defaultState() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  loadState();
+  const hasLocalState = loadLocalState();
   if (!state.currentOrderId) createNewOrder(false);
 
   if (byId('today')) byId('today').textContent = new Date().toLocaleDateString('da-DK');
@@ -87,6 +95,12 @@ window.addEventListener('DOMContentLoaded', () => {
   applyUI();
   setupSupabaseRealtime();
   updateInvoiceDates();
+
+  syncStateFromSupabase(hasLocalState).catch(err => {
+    console.warn('Supabase baggrundssynk fejlede', err);
+    setSaveStatus('Gemmer lokalt');
+    initialRemoteSyncDone = true;
+  });
 });
 
 function normalizeState() {
@@ -121,6 +135,18 @@ function normalizeState() {
   state.settings.wearPerHour ??= 5;
   state.settings.laborRate ??= 250;
   state.settings.defaultHoursPerDay ??= 16;
+  state.settings.calendarStartDate ||= '';
+  state.settings.calendarStartTime ||= '08:00';
+  state.settings.calendarChangeTimes = [...new Set(
+    (Array.isArray(state.settings.calendarChangeTimes)
+      ? state.settings.calendarChangeTimes
+      : ['08:00', '12:00', '16:00', '20:00'])
+      .filter(isValidTime)
+  )].sort();
+  if (state.settings.calendarChangeTimes.length === 0) {
+    state.settings.calendarChangeTimes = ['08:00', '12:00', '16:00', '20:00'];
+  }
+  state.settings.calendarAllowWeekends ??= true;
 
   state.filament ||= [];
   state.parts ||= [];
@@ -151,35 +177,210 @@ function normalizeState() {
   }));
 }
 
-function loadState() {
+function setSaveStatus(text) {
+  if (byId('saveStatus')) byId('saveStatus').textContent = text;
+}
+
+function timeoutAfter(ms, message) {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(message)), ms);
+  });
+}
+
+function createSupabaseClient() {
+  if (sbClient) return sbClient;
+  if (SUPABASE_URL && SUPABASE_KEY && window.supabase?.createClient) {
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+  return sbClient;
+}
+
+function loadSupabaseClient() {
+  const client = createSupabaseClient();
+  if (client || !SUPABASE_URL || !SUPABASE_KEY) return Promise.resolve(client);
+  if (supabaseClientPromise) return supabaseClientPromise;
+
+  supabaseClientPromise = new Promise(resolve => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve(createSupabaseClient());
+    };
+    const fail = err => {
+      if (done) return;
+      done = true;
+      console.warn('Supabase bibliotek kunne ikke indlæses', err);
+      resolve(null);
+    };
+
+    const existing = document.querySelector('script[data-ak3d-supabase]');
+    const script = existing || document.createElement('script');
+    script.addEventListener('load', finish, { once: true });
+    script.addEventListener('error', fail, { once: true });
+
+    if (!existing) {
+      script.src = SUPABASE_CDN_URL;
+      script.async = true;
+      script.dataset.ak3dSupabase = 'true';
+      document.head.appendChild(script);
+    }
+
+    setTimeout(finish, SUPABASE_TIMEOUT_MS);
+  });
+
+  return supabaseClientPromise;
+}
+
+function loadLocalState() {
   const raw = localStorage.getItem(LS_KEY);
+  let hasLocalState = false;
   if (raw) {
     try {
       state = JSON.parse(raw);
+      hasLocalState = true;
     } catch (err) {
       console.warn('Kunne ikke indlæse localStorage', err);
       state = defaultState();
     }
   }
   normalizeState();
+
+  if (!sbClient) {
+    setSaveStatus('Gemmer lokalt');
+  }
+
+  return hasLocalState;
 }
 
-function saveState() {
+async function syncStateFromSupabase(hasLocalState) {
+  setSaveStatus('Forbinder til Supabase...');
+  const client = await loadSupabaseClient();
+  if (!client) {
+    setSaveStatus('Gemmer lokalt');
+    initialRemoteSyncDone = true;
+    return;
+  }
+
+  try {
+    setSaveStatus('Henter fra Supabase...');
+    const request = client
+      .from('orders')
+      .select('payload, updated_at')
+      .eq('id', SUPABASE_STATE_ID)
+      .maybeSingle();
+    const { data, error } = await Promise.race([
+      request,
+      timeoutAfter(SUPABASE_TIMEOUT_MS, 'Supabase svarer ikke')
+    ]);
+
+    if (error) throw error;
+    if (data?.payload && typeof data.payload === 'object') {
+      state = data.payload;
+      normalizeState();
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      applyUI();
+      updateInvoiceDates();
+      setSaveStatus('Hentet fra Supabase');
+      return;
+    }
+
+    if (hasLocalState || state.currentOrderId) {
+      await saveRemoteState();
+      setSaveStatus('Synkroniseret til Supabase');
+    } else {
+      setSaveStatus('Supabase klar');
+    }
+  } catch (err) {
+    console.warn('Kunne ikke hente fra Supabase, bruger lokal kopi', err);
+    setSaveStatus('Gemmer lokalt');
+  } finally {
+    initialRemoteSyncDone = true;
+  }
+}
+
+function saveState(options = {}) {
   normalizeState();
   localStorage.setItem(LS_KEY, JSON.stringify(state));
+
+  if (options.flushRemote) return saveRemoteState();
+  queueRemoteSave();
+  return Promise.resolve();
+}
+
+function queueRemoteSave() {
+  if (!initialRemoteSyncDone) {
+    setSaveStatus('Gemmer lokalt');
+    return;
+  }
+  const client = createSupabaseClient();
+  if (!client) {
+    setSaveStatus('Gemt lokalt');
+    return;
+  }
+  if (remoteSaveTimer) clearTimeout(remoteSaveTimer);
+  setSaveStatus('Gemmer...');
+  remoteSaveTimer = setTimeout(() => {
+    remoteSaveTimer = null;
+    saveRemoteState().catch(err => {
+      console.warn('Supabase gemning fejlede', err);
+      setSaveStatus('Gemt lokalt');
+    });
+  }, 600);
+}
+
+async function saveRemoteState() {
+  const client = await loadSupabaseClient();
+  if (!client) {
+    setSaveStatus('Gemt lokalt');
+    return;
+  }
+  if (remoteSaveTimer) {
+    clearTimeout(remoteSaveTimer);
+    remoteSaveTimer = null;
+  }
+
+  normalizeState();
+  const snapshot = JSON.parse(JSON.stringify(state));
+  const pricing = computePricing();
+  const row = {
+    id: SUPABASE_STATE_ID,
+    order_no: SUPABASE_STATE_ORDER_NO,
+    project_name: state.projectName || 'AK3D Produktionssystem',
+    global_units: Math.max(0, Math.floor(num(state.globalUnits))),
+    status: state.order?.status || 'Tilbud',
+    priority: state.order?.priority || 'Normal',
+    start_date: state.order?.startDate || null,
+    deadline: state.order?.deadline || null,
+    tags: state.order?.tags || '',
+    notes: state.order?.notes || '',
+    customer_name: state.invoice?.customer || '',
+    total_inc: pricing.saleInc || 0,
+    payload: snapshot,
+    updated_at: new Date().toISOString()
+  };
+
+  setSaveStatus('Gemmer i Supabase...');
+  const request = client
+    .from('orders')
+    .upsert(row, { onConflict: 'id' });
+  const { error } = await Promise.race([
+    request,
+    timeoutAfter(SUPABASE_TIMEOUT_MS, 'Supabase gemning tog for lang tid')
+  ]);
+
+  if (error) throw error;
+  setSaveStatus('Gemt i Supabase');
 }
 
 function setupEvents() {
-  document.querySelectorAll('.navbtn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.navbtn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+  setupMenu();
 
-      document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-      byId('tab-' + btn.dataset.tab)?.classList.remove('hidden');
-
-      renderActiveTab(btn.dataset.tab);
-    });
+  byId('appNavigation')?.addEventListener('click', event => {
+    const btn = event.target.closest('.navbtn[data-tab]');
+    if (!btn) return;
+    event.preventDefault();
+    activateTab(btn.dataset.tab);
   });
 
   document.querySelectorAll('.modeBtn').forEach(btn => {
@@ -188,14 +389,25 @@ function setupEvents() {
       renderCalendar();
     });
   });
+  bindClick('calendarAddChangeTimeBtn', addCalendarChangeTime);
+  bindClick('calendarRefreshBtn', saveCalendarSettings);
+  bindChange('calendarStartDate', saveCalendarSettings);
+  bindChange('calendarStartTime', saveCalendarSettings);
+  bindChange('calendarAllowWeekends', saveCalendarSettings);
 
   bindChange('showUnitPriceOnInvoice', renderInvoice);
 
-  bindClick('saveBtn', () => {
+  bindClick('saveBtn', async () => {
     syncTopbarToState();
     saveCurrentOrderSnapshot();
-    saveState();
-    alert('Ordre gemt');
+    try {
+      await saveState({ flushRemote: true });
+      alert(sbClient ? 'Ordre gemt i Supabase' : 'Ordre gemt lokalt');
+    } catch (err) {
+      console.warn('Kunne ikke gemme i Supabase', err);
+      setSaveStatus('Gemt lokalt');
+      alert('Ordre gemt lokalt, men ikke i Supabase');
+    }
   });
 
   bindClick('newOrderBtnTop', () => createNewOrder(true));
@@ -262,6 +474,38 @@ function bindClick(id, fn) { byId(id)?.addEventListener('click', fn); }
 function bindInput(id, fn) { byId(id)?.addEventListener('input', fn); }
 function bindChange(id, fn) { byId(id)?.addEventListener('change', fn); }
 
+function setMenuOpen(open) {
+  document.body.classList.toggle('menu-open', open);
+  byId('menuToggleBtn')?.setAttribute('aria-expanded', String(open));
+}
+
+function setupMenu() {
+  bindClick('menuToggleBtn', () => setMenuOpen(!document.body.classList.contains('menu-open')));
+  bindClick('menuBackdrop', () => setMenuOpen(false));
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Escape') setMenuOpen(false);
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 900) setMenuOpen(false);
+  });
+}
+
+function activateTab(tab) {
+  const view = byId('tab-' + tab);
+  if (!view) return;
+
+  document.querySelectorAll('.navbtn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.querySelectorAll('.view').forEach(section => section.classList.add('hidden'));
+  view.classList.remove('hidden');
+
+  renderActiveTab(tab);
+  setMenuOpen(false);
+}
+
+window.activateTab = activateTab;
+
 function applyUI() {
   renderHeader();
   populateTopbar();
@@ -277,14 +521,13 @@ function applyUI() {
   renderPrinters();
   renderCustomers();
   renderDashboard();
-  renderCalendar();
   renderShopping();
   renderInvoice();
   renderPrinterAssignments();
 
   if (byId('inventoryPadMode')) byId('inventoryPadMode').checked = !!state.app.inventoryPadMode;
 
-  document.querySelector('.navbtn[data-tab="dashboard"]')?.click();
+  activateTab('dashboard');
 }
 
 function renderActiveTab(tab) {
@@ -664,7 +907,7 @@ function rerender() {
   renderInventory();
   renderPrinters();
   renderDashboard();
-  renderCalendar();
+  if (!byId('tab-calendar')?.classList.contains('hidden')) renderCalendar();
   renderShopping();
   renderInvoice();
   renderPrinterAssignments();
@@ -947,97 +1190,400 @@ window.deleteCustomer = function (id) {
   renderCustomers();
 };
 
-function computeSchedule() {
-  const totalHours = computeCostBreakdown().totals.totalPrintPlus;
-  const printers = getAssignedPrinters();
-  const startDate = state.order.startDate || new Date().toISOString().slice(0, 10);
-  if (printers.length === 0) return { startDate, finishDate: '-', bookings: [] };
+function isValidTime(value) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ''));
+}
 
-  const totalDaily = printers.reduce((s, p) => s + Math.max(0, num(p.hoursPerDay)), 0) || 1;
-  let remaining = totalHours;
-  const day = new Date(startDate + 'T00:00:00');
-  const bookings = [];
+function localDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
-  while (remaining > 0.001) {
-    const dateStr = day.toISOString().slice(0, 10);
-    let used = 0;
-    printers.forEach((p, idx) => {
-      if (remaining <= 0) return;
-      const share = num(p.hoursPerDay) / totalDaily;
-      let hrs = Math.min(num(p.hoursPerDay), remaining * share);
-      if (idx === printers.length - 1) hrs = Math.min(num(p.hoursPerDay), Math.max(0, remaining - used));
-      if (hrs > 0) {
-        bookings.push({ date: dateStr, printerName: p.name, orderNo: state.orderNo, projectName: state.projectName || '-', hours: Number(hrs.toFixed(2)), status: state.order.status });
-        used += hrs;
-      }
-    });
-    if (used <= 0) break;
-    remaining -= used;
-    day.setDate(day.getDate() + 1);
-    if (bookings.length > 700) break;
+function parseLocalDateTime(dateValue, timeValue = '00:00') {
+  const safeDate = /^\d{4}-\d{2}-\d{2}$/.test(dateValue || '') ? dateValue : localDateKey(new Date());
+  const safeTime = isValidTime(timeValue) ? timeValue : '00:00';
+  const [year, month, day] = safeDate.split('-').map(Number);
+  const [hour, minute] = safeTime.split(':').map(Number);
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
+}
+
+function formatScheduleDate(date) {
+  return date.toLocaleDateString('da-DK', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatScheduleTime(date) {
+  return date.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatScheduleDateTime(date) {
+  return `${formatScheduleDate(date)} ${formatScheduleTime(date)}`;
+}
+
+function formatMinutes(minutes) {
+  const total = Math.max(0, Math.round(num(minutes)));
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (hours === 0) return `${mins} min`;
+  if (mins === 0) return `${hours} t`;
+  return `${hours} t ${mins} min`;
+}
+
+function nextPreferredChangeTime(afterDate) {
+  const changeTimes = state.settings.calendarChangeTimes;
+  const allowWeekends = !!state.settings.calendarAllowWeekends;
+  const start = new Date(afterDate);
+
+  for (let offset = 0; offset < 370; offset++) {
+    const day = new Date(start);
+    day.setDate(start.getDate() + offset);
+    const weekDay = day.getDay();
+    if (!allowWeekends && (weekDay === 0 || weekDay === 6)) continue;
+
+    for (const time of changeTimes) {
+      const candidate = parseLocalDateTime(localDateKey(day), time);
+      if (candidate.getTime() >= start.getTime()) return candidate;
+    }
   }
-  return { startDate, finishDate: bookings.length ? bookings[bookings.length - 1].date : startDate, bookings };
+
+  return new Date(start);
+}
+
+function getPlanningOrders() {
+  const ordersById = new Map();
+  state.ordersHistory.forEach(order => {
+    if (order?.id) ordersById.set(order.id, JSON.parse(JSON.stringify(order)));
+  });
+
+  if (state.currentOrderId) {
+    ordersById.set(state.currentOrderId, {
+      id: state.currentOrderId,
+      orderNo: state.orderNo,
+      projectName: state.projectName,
+      globalUnits: state.globalUnits,
+      order: JSON.parse(JSON.stringify(state.order)),
+      items: JSON.parse(JSON.stringify(state.items)),
+      plateProgress: JSON.parse(JSON.stringify(state.plateProgress || {}))
+    });
+  }
+
+  const finishedStatuses = new Set(['Færdig', 'Leveret', 'Faktureret']);
+  return [...ordersById.values()].filter(order =>
+    order.items?.length && !finishedStatuses.has(order.order?.status)
+  );
+}
+
+function getOrderScheduleJobs(order) {
+  const jobs = [];
+  let runningPlateNo = 1;
+
+  (order.items || []).forEach((item, itemIndex) => {
+    if (item.status === 'Færdig') return;
+    const units = num(item.customQty) > 0 ? Math.max(0, num(item.customQty)) : Math.max(0, num(order.globalUnits));
+    const totalPieces = units * Math.max(1, num(item.multPerUnit));
+    const piecesPerPlate = Math.max(1, num(item.piecesPerPlate));
+    const plateCount = Math.ceil(totalPieces / piecesPerPlate);
+    const durationMinutes = Math.max(0, Math.round((num(item.plateHours) * 60) + num(item.plateMinutes)));
+
+    for (let plateIndex = 1; plateIndex <= plateCount; plateIndex++) {
+      const key = `${order.id || 'order'}::${item.id}::${plateIndex}`;
+      const savedStatus = order.plateProgress?.[key];
+      const status = savedStatus === true ? 'Færdig' : savedStatus === false ? 'Planlagt' : (savedStatus || item.status || 'Planlagt');
+      if (status !== 'Færdig') {
+        jobs.push({
+          key,
+          orderId: order.id,
+          orderNo: order.orderNo || '-',
+          projectName: order.projectName || '-',
+          orderStatus: order.order?.status || 'Planlagt',
+          priority: order.order?.priority || 'Normal',
+          deadline: order.order?.deadline || '',
+          orderStartDate: order.order?.startDate || '',
+          assignedPrinterIds: order.order?.assignedPrinterIds || [],
+          itemId: item.id,
+          itemName: item.name || 'Emne',
+          itemIndex,
+          plateIndex,
+          plateCount,
+          plateNo: runningPlateNo,
+          durationMinutes,
+          status
+        });
+      }
+      runningPlateNo++;
+    }
+  });
+
+  return jobs;
+}
+
+function schedulePriorityValue(priority) {
+  return { Haste: 0, Høj: 1, Normal: 2, Lav: 3 }[priority] ?? 2;
+}
+
+function computeSchedule() {
+  const startDate = state.settings.calendarStartDate || localDateKey(new Date());
+  const startTime = state.settings.calendarStartTime || '08:00';
+  const planStart = parseLocalDateTime(startDate, startTime);
+  const activePrinters = state.printers.filter(printer => printer.status === 'Aktiv');
+  const printerPlans = new Map(activePrinters.map(printer => [
+    printer.id,
+    { printer, availableAt: new Date(planStart), bookings: [] }
+  ]));
+  const warnings = [];
+  const warningKeys = new Set();
+  const addWarning = (key, text) => {
+    if (warningKeys.has(key)) return;
+    warningKeys.add(key);
+    warnings.push(text);
+  };
+
+  const jobs = getPlanningOrders()
+    .flatMap(getOrderScheduleJobs)
+    .sort((a, b) => {
+      const priorityDiff = schedulePriorityValue(a.priority) - schedulePriorityValue(b.priority);
+      if (priorityDiff !== 0) return priorityDiff;
+      const deadlineA = a.deadline || '9999-12-31';
+      const deadlineB = b.deadline || '9999-12-31';
+      if (deadlineA !== deadlineB) return deadlineA.localeCompare(deadlineB);
+      const startA = a.orderStartDate || startDate;
+      const startB = b.orderStartDate || startDate;
+      if (startA !== startB) return startA.localeCompare(startB);
+      if (a.orderNo !== b.orderNo) return String(a.orderNo).localeCompare(String(b.orderNo), 'da', { numeric: true });
+      if (a.itemIndex !== b.itemIndex) return a.itemIndex - b.itemIndex;
+      return a.plateIndex - b.plateIndex;
+    });
+
+  const bookings = [];
+  const switchMinutes = Math.max(0, num(state.settings.switchMin));
+
+  jobs.forEach(job => {
+    if (job.durationMinutes <= 0) {
+      addWarning(`duration-${job.orderId}-${job.itemId}`, `Ordre ${job.orderNo}: "${job.itemName}" mangler printtid.`);
+      return;
+    }
+
+    const eligiblePlans = job.assignedPrinterIds
+      .map(id => printerPlans.get(id))
+      .filter(Boolean);
+    if (eligiblePlans.length === 0) {
+      addWarning(`printer-${job.orderId}`, `Ordre ${job.orderNo}: vælg mindst én aktiv printer under Ordrer.`);
+      return;
+    }
+
+    const orderReady = parseLocalDateTime(job.orderStartDate || startDate, startTime);
+    const selected = eligiblePlans
+      .map(plan => ({
+        plan,
+        start: new Date(Math.max(plan.availableAt.getTime(), planStart.getTime(), orderReady.getTime()))
+      }))
+      .sort((a, b) => a.start - b.start || a.plan.printer.name.localeCompare(b.plan.printer.name, 'da'))[0];
+
+    const start = selected.start;
+    const end = new Date(start.getTime() + job.durationMinutes * 60000);
+    const changeAt = nextPreferredChangeTime(end);
+    const waitMinutes = Math.max(0, Math.round((changeAt - end) / 60000));
+    const deadlineAt = job.deadline ? parseLocalDateTime(job.deadline, '23:59') : null;
+    const booking = {
+      ...job,
+      printerId: selected.plan.printer.id,
+      printerName: selected.plan.printer.name,
+      start,
+      end,
+      changeAt,
+      waitMinutes,
+      deadlineLate: !!deadlineAt && changeAt > deadlineAt
+    };
+
+    selected.plan.bookings.push(booking);
+    selected.plan.availableAt = new Date(changeAt.getTime() + switchMinutes * 60000);
+    bookings.push(booking);
+  });
+
+  bookings.sort((a, b) => a.start - b.start || a.printerName.localeCompare(b.printerName, 'da'));
+  const finish = bookings.length
+    ? new Date(Math.max(...bookings.map(booking => booking.changeAt.getTime())))
+    : null;
+  const totalWaitMinutes = bookings.reduce((sum, booking) => sum + booking.waitMinutes, 0);
+
+  return {
+    startDate,
+    startTime,
+    planStart,
+    finish,
+    finishDate: finish ? localDateKey(finish) : '-',
+    bookings,
+    warnings,
+    printerPlans: [...printerPlans.values()].filter(plan => plan.bookings.length),
+    totalWaitMinutes
+  };
+}
+
+function addCalendarChangeTime() {
+  const input = byId('calendarNewChangeTime');
+  const time = input?.value;
+  if (!isValidTime(time)) return;
+  state.settings.calendarChangeTimes = [...new Set([...state.settings.calendarChangeTimes, time])].sort();
+  saveState();
+  renderCalendar();
+}
+
+window.removeCalendarChangeTime = function (time) {
+  if (state.settings.calendarChangeTimes.length <= 1) {
+    alert('Der skal være mindst ét tidspunkt til pladeskift.');
+    return;
+  }
+  state.settings.calendarChangeTimes = state.settings.calendarChangeTimes.filter(value => value !== time);
+  saveState();
+  renderCalendar();
+};
+
+function saveCalendarSettings() {
+  const startDate = byId('calendarStartDate')?.value || localDateKey(new Date());
+  const startTime = byId('calendarStartTime')?.value || '08:00';
+  state.settings.calendarStartDate = startDate;
+  state.settings.calendarStartTime = isValidTime(startTime) ? startTime : '08:00';
+  state.settings.calendarAllowWeekends = !!byId('calendarAllowWeekends')?.checked;
+  saveState();
+  renderCalendar();
+}
+
+function renderCalendarChangeTimes() {
+  const mount = byId('calendarChangeTimes');
+  if (!mount) return;
+  mount.innerHTML = state.settings.calendarChangeTimes.map(time => `
+    <div class="calendar-time-chip">
+      <span>${esc(time)}</span>
+      <button type="button" onclick="removeCalendarChangeTime('${esc(time)}')" aria-label="Fjern skiftetid ${esc(time)}" title="Fjern skiftetid">×</button>
+    </div>
+  `).join('');
+}
+
+function renderScheduleTable(rows, showPrinter = true) {
+  return `
+    <div class="schedule-table-wrap">
+      <table class="table-ui schedule-table">
+        <thead>
+          <tr>
+            <th>Start</th>
+            <th>Print færdig</th>
+            <th>Pladeskift</th>
+            ${showPrinter ? '<th>Printer</th>' : ''}
+            <th>Ordre</th>
+            <th>Emne</th>
+            <th>Plade</th>
+            <th>Printtid</th>
+            <th>Venter</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(booking => `
+            <tr class="${booking.deadlineLate ? 'schedule-late' : ''}">
+              <td><strong>${formatScheduleTime(booking.start)}</strong><div class="schedule-date-small">${formatScheduleDate(booking.start)}</div></td>
+              <td>${formatScheduleTime(booking.end)}</td>
+              <td><strong>${formatScheduleTime(booking.changeAt)}</strong><div class="schedule-date-small">${formatScheduleDate(booking.changeAt)}</div></td>
+              ${showPrinter ? `<td><span class="schedule-printer">${esc(booking.printerName)}</span></td>` : ''}
+              <td><strong>${esc(booking.orderNo)}</strong><div class="schedule-date-small">${esc(booking.projectName)}</div></td>
+              <td>${esc(booking.itemName)}</td>
+              <td>${booking.plateIndex} / ${booking.plateCount}</td>
+              <td>${formatMinutes(booking.durationMinutes)}</td>
+              <td>${booking.waitMinutes ? formatMinutes(booking.waitMinutes) : 'Ingen'}${booking.deadlineLate ? '<div class="schedule-deadline">Efter deadline</div>' : ''}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function calendarWeekKey(date) {
+  const monday = new Date(date);
+  const day = (monday.getDay() + 6) % 7;
+  monday.setDate(monday.getDate() - day);
+  monday.setHours(0, 0, 0, 0);
+  return localDateKey(monday);
 }
 
 function renderCalendar() {
+  if (!byId('calendarMount')) return;
+
+  setVal('calendarStartDate', state.settings.calendarStartDate || localDateKey(new Date()));
+  setVal('calendarStartTime', state.settings.calendarStartTime);
+  if (byId('calendarAllowWeekends')) byId('calendarAllowWeekends').checked = !!state.settings.calendarAllowWeekends;
+  renderCalendarChangeTimes();
+
   const sched = computeSchedule();
-  if (byId('calendarStart')) byId('calendarStart').textContent = sched.startDate || '-';
-  if (byId('calendarFinish')) byId('calendarFinish').textContent = sched.finishDate || '-';
-  if (byId('calendarPrinters')) byId('calendarPrinters').textContent = getAssignedPrinters().map(p => p.name).join(', ') || 'Ingen';
+  if (byId('calendarStart')) byId('calendarStart').textContent = formatScheduleDateTime(sched.planStart);
+  if (byId('calendarFinish')) byId('calendarFinish').textContent = sched.finish ? formatScheduleDateTime(sched.finish) : '-';
+  if (byId('calendarPrinters')) {
+    byId('calendarPrinters').textContent = sched.printerPlans.map(plan => plan.printer.name).join(', ') || 'Ingen';
+  }
+  if (byId('calendarWait')) byId('calendarWait').textContent = formatMinutes(sched.totalWaitMinutes);
 
   document.querySelectorAll('.modeBtn').forEach(btn => {
-    btn.classList.toggle('bg-indigo-600', btn.dataset.mode === calendarMode);
+    btn.classList.toggle('calendar-mode-active', btn.dataset.mode === calendarMode);
   });
 
+  const warnings = byId('calendarWarnings');
+  if (warnings) {
+    warnings.classList.toggle('hidden', sched.warnings.length === 0);
+    warnings.innerHTML = sched.warnings.map(text => `<div>${esc(text)}</div>`).join('');
+  }
+
   const mount = byId('calendarMount');
-  if (!mount) return;
-  const bookings = sched.bookings;
-  if (bookings.length === 0) {
-    mount.innerHTML = '<div class="text-slate-400">Ingen booking endnu</div>';
+  if (sched.bookings.length === 0) {
+    mount.innerHTML = `
+      <div class="calendar-empty">
+        <strong>Ingen plader kan planlægges endnu.</strong>
+        <span>Opret emner med printtid, og vælg aktive printere på ordren.</span>
+      </div>
+    `;
     return;
   }
 
-  if (calendarMode === 'day') {
-    const grouped = {};
-    bookings.forEach(b => { grouped[b.date] ||= []; grouped[b.date].push(b); });
-    mount.innerHTML = Object.keys(grouped).sort().map(date => `
-      <div class="mb-4">
-        <div class="font-semibold mb-2">${date}</div>
-        <table class="table-ui"><thead><tr><th>Printer</th><th>Ordre</th><th>Projekt</th><th class="text-right">Timer</th><th>Status</th></tr></thead><tbody>
-          ${grouped[date].map(b => `<tr><td>${esc(b.printerName)}</td><td>${esc(b.orderNo)}</td><td>${esc(b.projectName)}</td><td class="text-right">${fmtNum(b.hours)} t</td><td>${esc(b.status)}</td></tr>`).join('')}
-        </tbody></table>
-      </div>
+  if (calendarMode === 'printer') {
+    mount.innerHTML = sched.printerPlans.map(plan => `
+      <section class="schedule-group">
+        <div class="schedule-group-heading">
+          <div>
+            <h3>${esc(plan.printer.name)}</h3>
+            <span>${plan.bookings.length} plader · ${formatMinutes(plan.bookings.reduce((sum, booking) => sum + booking.durationMinutes, 0))} print</span>
+          </div>
+          <span class="schedule-finish">Ledig ${formatScheduleDateTime(plan.availableAt)}</span>
+        </div>
+        ${renderScheduleTable(plan.bookings, false)}
+      </section>
     `).join('');
     return;
   }
 
-  if (calendarMode === 'week') {
-    const weeks = {};
-    bookings.forEach(b => {
-      const d = new Date(b.date + 'T00:00:00');
-      const monday = new Date(d);
-      const day = (d.getDay() + 6) % 7;
-      monday.setDate(d.getDate() - day);
-      const key = monday.toISOString().slice(0, 10);
-      weeks[key] ||= [];
-      weeks[key].push(b);
-    });
-    mount.innerHTML = Object.keys(weeks).sort().map(weekStart => {
-      const rows = weeks[weekStart];
-      const byPrinter = {};
-      rows.forEach(r => { byPrinter[r.printerName] = (byPrinter[r.printerName] || 0) + r.hours; });
-      return `<div class="mb-4"><div class="font-semibold mb-2">Uge fra ${weekStart}</div><table class="table-ui"><thead><tr><th>Printer</th><th class="text-right">Timer</th><th>Ordrenumre</th></tr></thead><tbody>${Object.keys(byPrinter).map(pr => `<tr><td>${esc(pr)}</td><td class="text-right">${fmtNum(byPrinter[pr])} t</td><td>${[...new Set(rows.filter(r => r.printerName === pr).map(r => r.orderNo))].join(', ')}</td></tr>`).join('')}</tbody></table></div>`;
-    }).join('');
-    return;
-  }
+  const groups = {};
+  sched.bookings.forEach(booking => {
+    let key = localDateKey(booking.start);
+    if (calendarMode === 'week') key = calendarWeekKey(booking.start);
+    if (calendarMode === 'month') key = key.slice(0, 7);
+    groups[key] ||= [];
+    groups[key].push(booking);
+  });
 
-  const months = {};
-  bookings.forEach(b => { const m = b.date.slice(0, 7); months[m] ||= []; months[m].push(b); });
-  mount.innerHTML = Object.keys(months).sort().map(month => {
-    const rows = months[month];
-    const byDate = {};
-    rows.forEach(r => { byDate[r.date] ||= []; byDate[r.date].push(r); });
-    return `<div class="mb-4"><div class="font-semibold mb-2">${month}</div><table class="table-ui"><thead><tr><th>Dato</th><th>Printere der kører</th><th class="text-right">Timer total</th></tr></thead><tbody>${Object.keys(byDate).sort().map(date => `<tr><td>${date}</td><td>${[...new Set(byDate[date].map(r => r.printerName))].join(', ')}</td><td class="text-right">${fmtNum(byDate[date].reduce((s, r) => s + r.hours, 0))} t</td></tr>`).join('')}</tbody></table></div>`;
+  mount.innerHTML = Object.keys(groups).sort().map(key => {
+    let title = formatScheduleDate(parseLocalDateTime(key, '00:00'));
+    if (calendarMode === 'week') title = `Uge fra ${formatScheduleDate(parseLocalDateTime(key, '00:00'))}`;
+    if (calendarMode === 'month') {
+      title = parseLocalDateTime(`${key}-01`, '00:00').toLocaleDateString('da-DK', { month: 'long', year: 'numeric' });
+    }
+    return `
+      <section class="schedule-group">
+        <div class="schedule-group-heading">
+          <div>
+            <h3>${esc(title)}</h3>
+            <span>${groups[key].length} plader</span>
+          </div>
+        </div>
+        ${renderScheduleTable(groups[key], true)}
+      </section>
+    `;
   }).join('');
 }
 
@@ -1076,9 +1622,13 @@ function renderDashboard() {
   const pricing = computePricing();
   const cb = computeCostBreakdown();
   const sched = computeSchedule();
+  const currentOrderBookings = sched.bookings.filter(booking => booking.orderId === state.currentOrderId);
+  const currentOrderFinish = currentOrderBookings.length
+    ? new Date(Math.max(...currentOrderBookings.map(booking => booking.changeAt.getTime())))
+    : null;
   if (byId('dashStatus')) byId('dashStatus').textContent = state.order.status || '-';
   if (byId('dashHours')) byId('dashHours').textContent = fmtNum(cb.totals.totalPrintPlus) + ' t';
-  if (byId('dashFinish')) byId('dashFinish').textContent = sched.finishDate || '-';
+  if (byId('dashFinish')) byId('dashFinish').textContent = currentOrderFinish ? formatScheduleDateTime(currentOrderFinish) : '-';
   if (byId('dashSale')) byId('dashSale').textContent = fmtKr(pricing.saleInc);
   if (byId('dashOverview')) {
     byId('dashOverview').innerHTML = `
@@ -1230,16 +1780,22 @@ function exportCSV() {
   a.click();
 }
 
-function setupSupabaseRealtime() {
-  if (!sbClient) {
+async function setupSupabaseRealtime() {
+  const client = await loadSupabaseClient();
+  if (!client) {
     console.log('Supabase ikke aktiv – app kører kun localStorage');
     return;
   }
   try {
-    sbClient
-      .channel('orders-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, payload => {
-        console.log('Supabase ændring:', payload);
+    client
+      .channel('ak3d-app-state')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `id=eq.${SUPABASE_STATE_ID}`
+      }, payload => {
+        console.log('Supabase app-state ændring:', payload);
       })
       .subscribe();
   } catch (err) {
@@ -1249,7 +1805,7 @@ function setupSupabaseRealtime() {
 
 window.AK3D_DEBUG = {
   get state() { return state; },
-  sbClient,
+  get sbClient() { return sbClient; },
   rerender,
   saveState,
   getAllPlates
